@@ -163,7 +163,8 @@ button.bs-cell:active { filter: brightness(0.94); }
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
-.bs-serial-no { font-weight: 400; color: var(--bs-muted); margin-inline-end: 0.15em; font-size: 0.8em; }
+.bs-serial-no { font-weight: 500; color: var(--bs-muted); margin-right: 0.2em; font-size: 0.72em; }
+.bs-serial-o { font-size: 0.62em; vertical-align: 0.55em; text-decoration: underline; text-decoration-thickness: 0.09em; text-underline-offset: 0.12em; margin-left: 0.04em; }
 .bs-qr { flex: none; display: block; }
 .bs-qr svg { display: block; width: 100%; height: 100%; }
 

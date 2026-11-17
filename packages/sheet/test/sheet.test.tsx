@@ -177,7 +177,7 @@ describe("SheetLayout", () => {
     const html = renderToStaticMarkup(
       <SheetLayout {...props({ printLayout: layout({ arrangement: "grid", infoText: "Hello" }) })} />,
     );
-    expect(html).toMatch(/<section class="bs-meta".*№.*042.*bs-qr.*Hello/);
+    expect(html).toMatch(/<section class="bs-meta".*№ 042.*bs-qr.*Hello/);
     expect(html).not.toContain("<header");
   });
 
@@ -196,7 +196,7 @@ describe("SheetLayout", () => {
     expect(html).toContain("סיבוב ב");
     expect(html).toContain("משחק 3");
     expect(html).toContain("<b>בהצלחה</b>");
-    expect(html).toMatch(/dir="ltr"[^>]*><span class="bs-serial-no">№<\/span>042/);
+    expect(html).toMatch(/class="bs-serial" dir="ltr"[^>]*aria-label="№ 042"/);
   });
 });
 

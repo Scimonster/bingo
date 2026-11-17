@@ -59,9 +59,12 @@ function infoLengths(md: string): number[] {
 
 function Serial({ serial, fontMm }: { serial: number; fontMm: number }) {
   return (
-    <div className="bs-serial" dir="ltr" style={{ fontSize: mm(fontMm) }}>
-      <span className="bs-serial-no">№</span>
-      {formatSerial(serial)}
+    <div className="bs-serial" dir="ltr" style={{ fontSize: mm(fontMm) }} aria-label={`№ ${formatSerial(serial)}`}>
+      {/* "№" drawn from N + o: Heebo (embedded in the PDF) has no U+2116 glyph. */}
+      <span className="bs-serial-no" aria-hidden="true">
+        N<span className="bs-serial-o">o</span>
+      </span>
+      <span aria-hidden="true">{formatSerial(serial)}</span>
     </div>
   );
 }
