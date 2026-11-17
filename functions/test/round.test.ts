@@ -131,7 +131,7 @@ describe("central paper round", () => {
     // Host submits for a paper sheet: decided immediately.
     const hostClaim = await live(host, { action: "submitClaim", gameId, sessionId, serial: "5" });
     expect(["valid", "invalid"]).toContain(hostClaim.status);
-    expect((await claimDoc(gameId, sessionId, hostClaim.claimId).get()).data()).toMatchObject({ byHost: true, uid: null, playerName: "№005" });
+    expect((await claimDoc(gameId, sessionId, hostClaim.claimId).get()).data()).toMatchObject({ byHost: true, uid: null, playerName: "" });
 
     await expectError(live(ann, { action: "endRound", gameId, sessionId }), "permission-denied");
     await live(host, { action: "endRound", gameId, sessionId });

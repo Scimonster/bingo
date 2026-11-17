@@ -75,7 +75,7 @@ export async function submitClaim(ctx: Ctx, req: Req<"submitClaim">): Promise<Re
     const claim: Claim = {
       serial,
       uid: holder,
-      playerName: holderName ?? `№${serial}`,
+      playerName: holderName ?? "", // paper sheet nobody linked: UIs show the serial alone
       matchedPattern: computedValid ? newWins.map((w) => w.pattern.name).join(", ") : null,
       matchedPatternIds: newWins.map((w) => w.pattern.id),
       computedValid,
