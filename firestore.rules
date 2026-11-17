@@ -1,8 +1,355 @@
 rules_version = '2';
 
+// Security rules for the bingo app. Authoritative contract: docs/contracts.md and the
+// "Security model" section of docs/spec.md. Limits mirror packages/core/src/constants.ts.
+//
+// Principle: clients write only what they own and what cannot affect fairness. Everything
+// else (sheets, boards, members, draws, claims, join codes, ...) is written by Cloud Functions
+// through the Admin SDK, which bypasses these rules.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
+
+    // ---------------------------------------------------------------- auth helpers
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    // Hosts sign in with Google; players and displays are anonymous.
+    function isHost() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // ---------------------------------------------------------------- game helpers
+
+    function gameDoc(g) {
+      return get(/databases/$(database)/documents/games/$(g));
+    }
+
+    function isOwner(g) {
+      return signedIn() && gameDoc(g).data.ownerId == uid();
+    }
+
+    function isLocked(g) {
+      return gameDoc(g).data.get('contentLocked', false) == true;
+    }
+
+    function memberPath(g) {
+      return /databases/$(database)/documents/games/$(g)/members/$(uid());
+    }
+
+    function isMember(g) {
+      return signedIn() && exists(memberPath(g));
+    }
+
+    // Role of the caller in a round: "player", "display", or null.
+    function roundRole(g, s) {
+      return get(memberPath(g)).data.sessions.get(s, null);
+    }
+
+    function isRoundMember(g, s) {
+      return isMember(g) && roundRole(g, s) in ['player', 'display'];
+    }
+
+    function isDisplay(g, s) {
+      return isMember(g) && roundRole(g, s) == 'display';
+    }
+
+    // Keys changed by an update.
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // ---------------------------------------------------------------- value validators
+
+    function isInt(v, lo, hi) {
+      return v is int && v >= lo && v <= hi;
+    }
+
+    function isStr(v, lo, hi) {
+      return v is string && v.size() >= lo && v.size() <= hi;
+    }
+
+    function validTitle(t) {
+      return isStr(t, 1, 100);
+    }
+
+    function validLanguage(l) {
+      return l in ['he', 'en'];
+    }
+
+    function validStoragePath(p) {
+      return p is string && p.matches('^users/[^/]+/images/[^/]+$');
+    }
+
+    // CellContent: { type: "text"|"image", text?, storagePath? } (free-space content).
+    function validCellContent(c) {
+      return c is map
+        && c.keys().hasAll(['type'])
+        && c.keys().hasOnly(['type', 'text', 'storagePath'])
+        && c.type in ['text', 'image']
+        && (!('text' in c) || isStr(c.text, 0, 200))
+        && (!('storagePath' in c) || validStoragePath(c.storagePath));
+    }
+
+    function validFreeSpace(f, rows, cols) {
+      return f is map
+        && f.keys().hasAll(['enabled', 'row', 'col'])
+        && f.keys().hasOnly(['enabled', 'row', 'col', 'content'])
+        && f.enabled is bool
+        && isInt(f.row, 0, rows - 1)
+        && isInt(f.col, 0, cols - 1)
+        && (!('content' in f) || validCellContent(f.content));
+    }
+
+    function validSettings(s) {
+      return s is map
+        && s.keys().hasAll(['rows', 'cols', 'freeSpace', 'boardsPerSheet'])
+        && s.keys().hasOnly(['rows', 'cols', 'freeSpace', 'boardsPerSheet'])
+        && isInt(s.rows, 3, 9)
+        && isInt(s.cols, 3, 9)
+        && isInt(s.boardsPerSheet, 1, 4)
+        && validFreeSpace(s.freeSpace, s.rows, s.cols);
+    }
+
+    function validSlotLabelAt(labels, i) {
+      return labels.size() <= i || isStr(labels[i], 0, 40);
+    }
+
+    function validPrintLayout(p) {
+      return p is map
+        && p.keys().hasAll(['slotLabels', 'infoText', 'paperSize', 'orientation', 'arrangement', 'marginMm'])
+        && p.keys().hasOnly(['heading', 'slotLabels', 'infoText', 'paperSize', 'orientation', 'arrangement', 'marginMm'])
+        && (!('heading' in p) || isStr(p.heading, 0, 120))
+        && p.slotLabels is list
+        && p.slotLabels.size() <= 4
+        && validSlotLabelAt(p.slotLabels, 0)
+        && validSlotLabelAt(p.slotLabels, 1)
+        && validSlotLabelAt(p.slotLabels, 2)
+        && validSlotLabelAt(p.slotLabels, 3)
+        && isStr(p.infoText, 0, 1500)
+        && p.paperSize in ['A5', 'A4', 'A3', 'Letter', 'Legal', 'Tabloid']
+        && p.orientation in ['portrait', 'landscape']
+        && p.arrangement in ['row', 'column', 'grid', 'single']
+        && (p.marginMm is int || p.marginMm is float)
+        && p.marginMm >= 0 && p.marginMm <= 30;
+    }
+
+    // Pattern: { id, name, cells?: number[], group? } with cells or a group. Kept deliberately
+    // shallow: rules count every evaluated expression (max 1000 per request) and 10 fully
+    // validated patterns exceed that. Element values (cell indices, group names, string lengths)
+    // are validated by Functions with the shared zod schema before use.
+    function validPattern(p) {
+      let k = p.keys();
+      return k.hasAll(['id', 'name'])
+        && k.hasOnly(['id', 'name', 'cells', 'group'])
+        && k.hasAny(['cells', 'group'])
+        && p.id is string
+        && p.name is string
+        && p.get('cells', []) is list;
+    }
+
+    function validPatternAt(ps, n, i) {
+      return n <= i || validPattern(ps[i]);
+    }
+
+    // Custom patterns: the owner's own pattern library (max 20). Only the list is checked here:
+    // validating 20 elements would exceed the rules' 1000-expression budget, and the library is
+    // only read by its owner (startRound re-validates the patterns it receives).
+    function validCustomPatterns(ps) {
+      return ps is list && ps.size() <= 20;
+    }
+
+    // Round patterns: 1–10, built-in groups or cell sets.
+    function validRoundPatterns(patterns) {
+      let ps = patterns;
+      let n = ps.size();
+      return ps is list && n >= 1 && n <= 10
+        && validPatternAt(ps, n, 0) && validPatternAt(ps, n, 1)
+        && validPatternAt(ps, n, 2) && validPatternAt(ps, n, 3)
+        && validPatternAt(ps, n, 4) && validPatternAt(ps, n, 5)
+        && validPatternAt(ps, n, 6) && validPatternAt(ps, n, 7)
+        && validPatternAt(ps, n, 8) && validPatternAt(ps, n, 9);
+    }
+
+    // Validates the client-editable game fields of `d`; only `keys` are checked (so an update
+    // re-validates just what it changes).
+    function validGameFields(d, keys) {
+      return (!('title' in keys) || validTitle(d.title))
+        && (!('playerLanguage' in keys) || validLanguage(d.playerLanguage))
+        && (!('settings' in keys) || validSettings(d.settings))
+        && (!('printLayout' in keys) || validPrintLayout(d.printLayout))
+        && (!('customPatterns' in keys) || validCustomPatterns(d.customPatterns));
+    }
+
+    // Board shape is frozen once sheets exist (contentLocked). The free-space content stays
+    // editable: it only affects display and print.
+    function boardShapeUnchanged() {
+      let a = request.resource.data.settings;
+      let b = resource.data.settings;
+      return a.rows == b.rows
+        && a.cols == b.cols
+        && a.boardsPerSheet == b.boardsPerSheet
+        && a.freeSpace.enabled == b.freeSpace.enabled
+        && a.freeSpace.row == b.freeSpace.row
+        && a.freeSpace.col == b.freeSpace.col;
+    }
+
+    // ---------------------------------------------------------------- games
+
+    match /games/{gameId} {
+      allow get: if signedIn() && (resource.data.ownerId == uid() || isMember(gameId));
+      // The "My games" list: where("ownerId", "==", uid).
+      allow list: if signedIn() && resource.data.ownerId == uid();
+
+      allow create: if isHost()
+        && request.resource.data.keys().hasAll(['ownerId', 'title', 'createdAt', 'playerLanguage', 'settings', 'printLayout'])
+        && request.resource.data.keys().hasOnly(['ownerId', 'title', 'createdAt', 'playerLanguage', 'settings', 'printLayout', 'customPatterns'])
+        && request.resource.data.ownerId == uid()
+        && request.resource.data.createdAt == request.time
+        && validGameFields(request.resource.data, request.resource.data.keys());
+
+      allow update: if isHost()
+        && resource.data.ownerId == uid()
+        && changed().hasOnly(['title', 'playerLanguage', 'settings', 'printLayout', 'customPatterns'])
+        && validGameFields(request.resource.data, changed())
+        && (!('settings' in changed()) || resource.data.get('contentLocked', false) != true || boardShapeUnchanged());
+
+      allow delete: if false; // deleteGame callable
+
+      // ---- content items: owner only, and only while unlocked
+      function validItem(d) {
+        return d.keys().hasAll(['type', 'createdAt'])
+          && (
+            (d.type == 'text'
+              && d.keys().hasOnly(['type', 'text', 'createdAt'])
+              && isStr(d.text, 1, 200))
+            || (d.type == 'image'
+              && d.keys().hasOnly(['type', 'storagePath', 'text', 'createdAt'])
+              && validStoragePath(d.storagePath)
+              && (!('text' in d) || isStr(d.text, 0, 200)))
+          );
+      }
+
+      match /items/{itemId} {
+        allow read: if isOwner(gameId) || isMember(gameId);
+        allow create: if isOwner(gameId) && !isLocked(gameId)
+          && validItem(request.resource.data)
+          && request.resource.data.createdAt == request.time;
+        allow update: if isOwner(gameId) && !isLocked(gameId)
+          && validItem(request.resource.data)
+          && (request.resource.data.createdAt == resource.data.createdAt
+              || request.resource.data.createdAt == request.time);
+        allow delete: if isOwner(gameId) && !isLocked(gameId);
+      }
+
+      // ---- generated content: Functions only
+      match /sheets/{serial} {
+        allow read: if isOwner(gameId) || isMember(gameId);
+        allow write: if false;
+      }
+
+      match /boards/{boardId} {
+        allow read: if isOwner(gameId) || isMember(gameId);
+        allow write: if false;
+      }
+
+      match /members/{memberUid} {
+        allow read: if (signedIn() && memberUid == uid()) || isOwner(gameId);
+        allow write: if false;
+      }
+
+      // ---- rounds
+      match /sessions/{sessionId} {
+        allow get: if isOwner(gameId) || isRoundMember(gameId, sessionId);
+        allow list: if isOwner(gameId);
+        allow create, delete: if false; // startRound / deleteRound
+
+        function legalStatusChange(from, to) {
+          return from == to
+            || (from == 'lobby' && to == 'live')
+            || (from == 'live' && to == 'paused')
+            || (from == 'paused' && to == 'live');
+        }
+
+        function validAutoDrawUpdate() {
+          let a = request.resource.data.autoDraw;
+          return a is map
+            && a.diff(resource.data.autoDraw).affectedKeys().hasOnly(['enabled', 'intervalSec'])
+            && a.enabled is bool
+            && isInt(a.intervalSec, 5, 300);
+        }
+
+        allow update: if isOwner(gameId)
+          && resource.data.status != 'ended'
+          && changed().hasOnly(['status', 'autoDraw', 'patterns', 'verification', 'boardsPerPlayer', 'autoMark', 'onWin'])
+          && legalStatusChange(resource.data.status, request.resource.data.status)
+          && (!('autoDraw' in changed()) || validAutoDrawUpdate())
+          && (!('patterns' in changed()) || validRoundPatterns(request.resource.data.patterns))
+          && (!('verification' in changed()) || request.resource.data.verification in ['auto', 'host'])
+          && (!('boardsPerPlayer' in changed()) || isInt(request.resource.data.boardsPerPlayer, 1, 10))
+          && (!('autoMark' in changed()) || request.resource.data.autoMark is bool)
+          && (!('onWin' in changed()) || request.resource.data.onWin in ['continue', 'end']);
+
+        // drawState and display token: never client-accessible.
+        match /private/{docId} {
+          allow read, write: if false;
+        }
+
+        match /players/{playerUid} {
+          function isSelf() {
+            return signedIn() && playerUid == uid();
+          }
+
+          function validName(n) {
+            return isStr(n, 1, 30);
+          }
+
+          function validMarkList(vs, i) {
+            return vs.size() <= i || (vs[i] is list && vs[i].size() <= 81);
+          }
+
+          // marks: { [serial]: number[] } with serial ⊆ own sheets (at most 10 sheets).
+          function validMarks(m, sheets) {
+            return m is map
+              && m.keys().hasOnly(sheets)
+              && m.size() <= 10
+              && validMarkList(m.values(), 0) && validMarkList(m.values(), 1)
+              && validMarkList(m.values(), 2) && validMarkList(m.values(), 3)
+              && validMarkList(m.values(), 4) && validMarkList(m.values(), 5)
+              && validMarkList(m.values(), 6) && validMarkList(m.values(), 7)
+              && validMarkList(m.values(), 8) && validMarkList(m.values(), 9);
+          }
+
+          allow get: if isSelf() || isOwner(gameId) || isDisplay(gameId, sessionId);
+          allow list: if isOwner(gameId) || isDisplay(gameId, sessionId);
+          allow create, delete: if false; // joinRound / removePlayer
+
+          allow update: if
+            (isSelf()
+              && changed().hasOnly(['name', 'marks'])
+              && (!('name' in changed()) || validName(request.resource.data.name))
+              && (!('marks' in changed()) || validMarks(request.resource.data.marks, resource.data.sheets)))
+            || (isOwner(gameId)
+              && changed().hasOnly(['name'])
+              && validName(request.resource.data.name));
+        }
+
+        match /claims/{claimId} {
+          // Claimant query: where("uid", "==", myUid).
+          allow read: if (signedIn() && resource.data.uid == uid())
+            || isOwner(gameId)
+            || isDisplay(gameId, sessionId);
+          allow write: if false; // submitClaim / decideClaim
+        }
+      }
+    }
+
+    match /joinCodes/{code} {
       allow read, write: if false;
     }
   }

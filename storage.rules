@@ -1,12 +1,40 @@
 rules_version = '2';
 
-// Craft rules based on data in your Firestore database
-// allow write: if firestore.get(
-//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
+// Storage rules for the bingo app. See docs/contracts.md ("Storage") and docs/spec.md
+// ("Security model"). Admin SDK writes from Cloud Functions bypass these rules.
 service firebase.storage {
   match /b/{bucket}/o {
-    match /{allPaths=**} {
-      allow read, write: if false;
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isHost() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Host images, resized client-side: users/{uid}/images/{imageId}/{thumb|print}.webp.
+    // Paths are random; Firestore decides who learns one, so any signed-in user may fetch by path,
+    // but only the owner may list the folder.
+    match /users/{userId}/images/{allPaths=**} {
+      allow list: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/images/{imageId}/{fileName} {
+      allow get: if signedIn();
+      allow create, update: if isHost()
+        && request.auth.uid == userId
+        && fileName in ['thumb.webp', 'print.webp']
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType in ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+      allow delete: if false; // cleanupUnreferencedImages
+    }
+
+    // Sheet PDFs, written by exportSheetsPdf; readable by the game owner only.
+    match /exports/{gameId}/{fileName} {
+      allow read: if signedIn()
+        && firestore.get(/databases/(default)/documents/games/$(gameId)).data.ownerId == request.auth.uid;
+      allow write: if false;
     }
   }
 }
