@@ -23,8 +23,7 @@ export default function Landing() {
     setBusy(true);
     setError(null);
     try {
-      await signInWithGoogle();
-      navigate("/games");
+      if (await signInWithGoogle()) navigate("/games");
     } catch (e) {
       const msg = errorMessage(e);
       if (!/popup-closed|cancelled-popup/.test(msg)) setError(msg);

@@ -37,8 +37,8 @@ export function SheetsTab(props: TabProps) {
   const [view, setView] = useState<"samples" | "sheets">("samples");
   const hasSheets = sheets.data.length > 0;
   useEffect(() => {
-    if (hasSheets) setView("sheets");
-  }, [hasSheets]);
+    if (!sheets.loading) setView(hasSheets ? "sheets" : "samples");
+  }, [hasSheets, sheets.loading]);
 
   return (
     <div className="space-y-4">

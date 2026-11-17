@@ -50,15 +50,13 @@ function TextItems({ gameId, items, allItems, locked, loading }: { gameId: strin
       setMsg({ kind: "warn", text: `“${t}” is already in the list.` });
       return;
     }
-    setBusy(true);
     setMsg(null);
+    setText("");
     try {
       await addDoc(itemsCol(gameId), { type: "text", text: t, createdAt: serverTimestamp() });
-      setText("");
     } catch (e) {
+      setText(t);
       setMsg({ kind: "error", text: errorMessage(e) });
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -320,8 +318,8 @@ function ImageTile({ gameId, item, url, locked, onDelete }: { gameId: string; it
   };
   return (
     <li className="group relative flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-      <div className="flex aspect-square items-center justify-center">
-        {url ? <img src={url} alt={item.text ?? "Image item"} className="h-full w-full object-contain" loading="lazy" /> : <Spinner className="text-slate-400" />}
+      <div className="relative flex aspect-square items-center justify-center">
+        {url ? <img src={url} alt={item.text ?? "Image item"} className="absolute inset-0 size-full object-contain" loading="lazy" /> : <Spinner className="text-slate-400" />}
       </div>
       {caption !== null ? (
         <form

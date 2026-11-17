@@ -99,7 +99,7 @@ export function PrintLayoutEditor({ layout, settings, onChange }: { layout: Prin
       </p>
       {m.tooSmall && (
         <Alert kind="warn">
-          Cells are smaller than {MIN_CELL_MM} mm and may be hard to read. Try landscape, a bigger paper size, a different arrangement or a smaller margin.
+          Cells are smaller than {MIN_CELL_MM} mm and may be hard to read. Try the other orientation, a bigger paper size, a different arrangement or a smaller margin.
         </Alert>
       )}
     </div>
