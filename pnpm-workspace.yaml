@@ -1,0 +1,25 @@
+packages:
+  - apps/*
+  - packages/*
+  - functions
+  - tests/*
+minimumReleaseAgeExclude:
+  - "@firebase/analytics-compat@0.2.32"
+  - "@firebase/analytics@0.10.26"
+  - "@firebase/app-check-compat@0.4.8"
+  - "@firebase/app-check@0.13.2"
+  - "@firebase/app-compat@0.5.23"
+  - "@firebase/app@0.16.7"
+  - "@firebase/auth-compat@0.6.16"
+  - "@firebase/auth@1.13.11"
+  - "@firebase/crashlytics@0.2.0"
+  - "@tanstack/query-core@5.108.0"
+  - "@tanstack/react-query@5.108.0"
+  - firebase@13.4.0
+  - puppeteer-core@25.18.0
+allowBuilds:
+  esbuild: true
+  protobufjs: true
+  re2: true
+  "@firebase/util": true
+  "@parcel/watcher": true
