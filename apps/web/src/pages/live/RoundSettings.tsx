@@ -41,16 +41,14 @@ export function RoundSettings({ sessionPath, session: s }: { sessionPath: string
           <input type="checkbox" className="size-5 accent-indigo-600" checked={s.autoMark} disabled={disabled} onChange={(e) => set({ autoMark: e.target.checked })} />
         </label>
       )}
-      {s.medium === "digital" && (
-        <label className="flex items-center justify-between gap-2">
-          Sheets per player
-          <Select value={s.boardsPerPlayer} disabled={disabled} onChange={(e) => set({ boardsPerPlayer: Number(e.target.value) })}>
-            {Array.from({ length: LIMITS.sheetsPerPlayerMax }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </Select>
-        </label>
-      )}
+      <label className="flex items-center justify-between gap-2">
+        {s.medium === "digital" ? "Sheets per player" : "Sheets a player may link"}
+        <Select value={s.boardsPerPlayer} disabled={disabled} onChange={(e) => set({ boardsPerPlayer: Number(e.target.value) })}>
+          {Array.from({ length: LIMITS.sheetsPerPlayerMax }, (_, i) => i + 1).map((n) => (
+            <option key={n} value={n}>{n}</option>
+          ))}
+        </Select>
+      </label>
       {error && <Alert kind="error">{error}</Alert>}
     </Card>
   );

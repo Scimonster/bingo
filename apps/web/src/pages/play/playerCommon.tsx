@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 import { signInAnonymously, type User } from "firebase/auth";
 import type { Lang } from "@bingo/core";
 import { auth } from "../../lib/firebase";
-import { errorMessage } from "../../lib/callables";
 import { PlayerLanguage, useLang, type StringKey } from "../../lib/i18n";
 import { cn } from "../../components/ui";
 
@@ -13,11 +12,32 @@ export async function ensureUser(): Promise<User> {
   return cred.user;
 }
 
-/** Player-facing error text for a callable failure. */
+const REASONS: Record<string, StringKey> = {
+  "bad-code": "invalidCode",
+  "round-ended": "roundEnded",
+  "not-joined": "notInRound",
+  "player-not-found": "notInRound",
+  "not-live": "waitingToStart",
+  "sheet-not-found": "errSheetNotFound",
+  "sheet-taken": "errSheetTaken",
+  "sheet-cap": "errSheetCap",
+  "not-your-sheet": "errNotYourSheet",
+  "bad-token": "displayLinkFailed",
+  "token-used": "displayLinkFailed",
+  "token-expired": "displayLinkFailed",
+};
+
+/** Machine-readable reason of a callable error (`details.reason` set by the Functions). */
+export function errorReason(e: unknown): string | null {
+  const d = e && typeof e === "object" && "details" in e ? (e as { details: unknown }).details : null;
+  return d && typeof d === "object" && "reason" in d ? String((d as { reason: unknown }).reason) : null;
+}
+
+/** Player-language error text for a callable failure (Function messages are English). */
 export function playerError(e: unknown, t: (k: StringKey) => string, fallback: StringKey = "error"): string {
-  const code = e && typeof e === "object" && "code" in e ? String((e as { code: unknown }).code) : "";
-  if (code === "functions/internal" || code === "functions/unavailable") return t(fallback);
-  return errorMessage(e) || t(fallback);
+  const reason = errorReason(e);
+  if (reason && REASONS[reason]) return t(REASONS[reason]);
+  return t(fallback);
 }
 
 const JOIN_LANG_KEY = "bingo:joinLang";

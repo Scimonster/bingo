@@ -148,7 +148,7 @@ function ConsoleTopBar({ gameId, sessionId, session: s, title, slotLabel, player
     });
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white shadow-sm">
       <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2">
         <div className="min-w-0">
           <Link to={`/games/${gameId}?tab=rounds`} className="text-xs text-slate-500 hover:underline">← Game</Link>

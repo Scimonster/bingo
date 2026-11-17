@@ -22,7 +22,15 @@ export function ClaimsPanel({
   const { busy, error, run } = useAction();
   const drawnIds = useMemo(() => s.draws.map((d) => d.itemId), [s.draws]);
   const ids = { gameId, sessionId };
-  const decide = (claimId: string, accept: boolean) => run(`decide:${claimId}`, () => liveRound({ action: "decideClaim", ...ids, claimId, accept }));
+  const decide = (claimId: string, accept: boolean) =>
+    run(`decide:${claimId}`, async () => {
+      const r = await liveRound({ action: "decideClaim", ...ids, claimId, accept });
+      // Auto-draw was held while the claim waited: restart its interval from now instead of drawing at once.
+      if (s.autoDraw.enabled && pending.length <= 1 && s.status === "live") {
+        await liveRound({ action: "setAutoDraw", ...ids, enabled: true, intervalSec: s.autoDraw.intervalSec });
+      }
+      return r;
+    });
   const sortedPending = [...pending].sort((a, b) => a.createdAt - b.createdAt);
 
   return (

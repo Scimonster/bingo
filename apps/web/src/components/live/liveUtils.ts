@@ -123,3 +123,14 @@ export function formatDuration(sec: number): string {
   const r = s % 60;
   return h ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
 }
+
+/** Column count that gives the largest square cells for `n` items in a w×h box (with `gap` px between cells). */
+export function bestGridColumns(n: number, w: number, h: number, gap = 0): { cols: number; rows: number; size: number } {
+  let best = { cols: 1, rows: Math.max(1, n), size: 0 };
+  for (let cols = 1; cols <= Math.max(1, n); cols++) {
+    const rows = Math.ceil(n / cols);
+    const size = Math.min((w - gap * (cols - 1)) / cols, (h - gap * (rows - 1)) / rows);
+    if (size > best.size) best = { cols, rows, size };
+  }
+  return { ...best, size: Math.max(0, Math.floor(best.size)) };
+}

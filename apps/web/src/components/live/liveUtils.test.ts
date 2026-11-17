@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  autoDrawBlocker, coveredCells, formatDuration, isAutoDrawDue, normalizeSerialInput, parseSheetQr, readLastRound,
+  autoDrawBlocker, bestGridColumns, coveredCells, formatDuration, isAutoDrawDue, normalizeSerialInput, parseSheetQr, readLastRound,
   secondsUntil, spinFrames, spinSchedule, toggleMark, writeLastRound, type AutoDrawSession,
 } from "./liveUtils";
 
@@ -90,5 +90,13 @@ describe("spinner", () => {
   it("formats durations", () => {
     expect(formatDuration(65)).toBe("1:05");
     expect(formatDuration(3725)).toBe("1:02:05");
+  });
+});
+
+describe("bestGridColumns", () => {
+  it("fills a wide box with more columns", () => {
+    expect(bestGridColumns(36, 1200, 600)).toMatchObject({ cols: 9, rows: 4 });
+    expect(bestGridColumns(36, 600, 600)).toMatchObject({ cols: 6, rows: 6, size: 100 });
+    expect(bestGridColumns(0, 100, 100).cols).toBe(1);
   });
 });

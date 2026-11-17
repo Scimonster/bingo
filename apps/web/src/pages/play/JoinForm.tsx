@@ -3,7 +3,7 @@ import { LIMITS, isValidJoinCode, normalizeJoinCode, type LiveRoundResponses } f
 import { liveRound } from "../../lib/callables";
 import { useT } from "../../lib/i18n";
 import { Alert, Button, Input } from "../../components/ui";
-import { BigSpinnerMessage, ensureUser, playerError } from "./playerCommon";
+import { BigSpinnerMessage, ensureUser, errorReason, playerError } from "./playerCommon";
 
 const NAME_KEY = "bingo:playerName";
 
@@ -60,9 +60,9 @@ export function JoinForm({ initialCode, intro, onJoined }: { initialCode?: strin
       const r = await liveRound({ action: "joinRound", code: normalized, name: n });
       await onJoined(r);
     } catch (err) {
-      const c = err && typeof err === "object" && "code" in err ? String((err as { code: unknown }).code) : "";
-      setError(c === "functions/not-found" ? t("invalidCode") : playerError(err, t, "joinFailed"));
-      setStep(c === "functions/not-found" ? "code" : "name");
+      const badCode = errorReason(err) === "bad-code";
+      setError(playerError(err, t, "joinFailed"));
+      setStep(badCode ? "code" : "name");
     }
   };
 
@@ -85,7 +85,7 @@ export function JoinForm({ initialCode, intro, onJoined }: { initialCode?: strin
             maxLength={12}
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="ABC123"
+            placeholder="K7XP9Q"
             aria-label={t("joinCode")}
             className="h-16 text-center font-mono text-3xl font-bold tracking-[0.3em] uppercase"
           />

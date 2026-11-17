@@ -202,7 +202,7 @@ function LiveView({ gameId, session: s, game, resolve, items }: StageProps) {
         <div className="flex w-full items-center justify-between gap-4">
           <div className="text-[min(3.2vw,5.5vh)] font-black tabular-nums">
             <span className="text-white/60 text-[0.55em] font-semibold">{t("draws")} </span>
-            {fmt(t("drawOfTotal"), { n: revealed, total })}
+            <span dir="ltr">{fmt(t("drawOfTotal"), { n: revealed, total })}</span>
           </div>
           {countdown !== null && (
             <div className="rounded-full bg-white/10 px-[1.5vw] py-[0.5vh] text-[min(2.2vw,3.8vh)] tabular-nums">
@@ -279,8 +279,10 @@ function WinOverlay({ gameId, session: s, grid, resolve, slotLabel }: { gameId: 
   const current = queue[0];
   useEffect(() => {
     if (!current) return;
-    const tm = setTimeout(() => setQueue((q) => q.slice(1)), WIN_SHOW_MS);
+    // A burst of winners (or a backlog) cycles faster so the room isn't kept waiting.
+    const tm = setTimeout(() => setQueue((q) => q.slice(1)), queue.length > 2 ? WIN_SHOW_MS / 3 : WIN_SHOW_MS);
     return () => clearTimeout(tm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
   // Check the board against the draws up to the win.
   const drawnIds = useMemo(() => s.draws.map((d) => d.itemId), [s.draws]);
@@ -291,7 +293,7 @@ function WinOverlay({ gameId, session: s, grid, resolve, slotLabel }: { gameId: 
       {current && (
         <motion.div
           key={`${current.claimId}-${current.patternId}`}
-          className="absolute inset-0 z-30 flex cursor-pointer items-center justify-center gap-[4vw] bg-slate-950/92 p-[3vw]"
+          className="absolute inset-0 z-30 flex cursor-pointer items-center justify-center gap-[4vw] bg-slate-950/95 p-[3vw]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -301,7 +303,7 @@ function WinOverlay({ gameId, session: s, grid, resolve, slotLabel }: { gameId: 
             <div className="text-[min(9vw,15vh)] leading-none font-black text-yellow-300">{t("bingo")}</div>
             <div className="text-[min(5vw,9vh)] leading-tight font-black break-words" dir="auto">{current.name}</div>
             <div className="text-[min(2.6vw,4.4vh)] text-white/80">
-              <span dir="ltr">{fmt(t("sheetNo"), { serial: current.serial })}</span> · <span dir="auto">{slotLabel}</span>
+              <bdi>{fmt(t("sheetNo"), { serial: current.serial })}</bdi> · <bdi>{slotLabel}</bdi>
             </div>
             <div className="rounded-full bg-yellow-300 px-[2vw] py-[0.6vh] text-[min(2.4vw,4vh)] font-bold text-slate-950" dir="auto">
               {patternLabel(t, { id: current.patternId, name: current.pattern })}

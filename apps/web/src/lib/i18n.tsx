@@ -81,6 +81,10 @@ const en = {
   allDrawn: "All items have been drawn",
   connectingDisplay: "Connecting display…",
   displayLinkFailed: "This display link is invalid or has already been used",
+  errSheetNotFound: "There is no sheet with that number in this game",
+  errSheetTaken: "Someone else already linked that sheet",
+  errSheetCap: "You've already linked the maximum number of sheets",
+  errNotYourSheet: "That sheet isn't linked to you",
   // Patterns
   pattern_line: "Any line",
   pattern_row: "Any row",
@@ -168,6 +172,10 @@ const he: Record<StringKey, string> = {
   allDrawn: "כל הפריטים הוגרלו",
   connectingDisplay: "מחברים את התצוגה…",
   displayLinkFailed: "קישור התצוגה אינו תקין או שכבר נעשה בו שימוש",
+  errSheetNotFound: "אין כרטיס עם המספר הזה במשחק",
+  errSheetTaken: "מישהו אחר כבר קישר את הכרטיס הזה",
+  errSheetCap: "כבר קישרתם את מספר הכרטיסים המרבי",
+  errNotYourSheet: "הכרטיס הזה אינו מקושר אליכם",
   // Patterns
   pattern_line: "שורה כלשהי",
   pattern_row: "שורה אופקית",
