@@ -13,10 +13,10 @@
   },
   "main": "lib/index.js",
   "dependencies": {
-    "@sparticuz/chromium": "^153.0.0",
+    "@sparticuz/chromium": "153.0.0",
     "firebase-admin": "^14.5.1",
     "firebase-functions": "^7.4.0",
-    "puppeteer-core": "^25.18.0"
+    "puppeteer-core": "25.11.0"
   },
   "devDependencies": {
     "@bingo/core": "workspace:*",
