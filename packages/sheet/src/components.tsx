@@ -194,7 +194,7 @@ export function InfoText({ md, className, style }: { md: string; className?: str
             return (
               <ul key={i} dir="auto">
                 {b.items.map((it, j) => (
-                  <li key={j}>{renderInline(it)}</li>
+                  <li key={j} dir="auto">{renderInline(it)}</li>
                 ))}
               </ul>
             );
@@ -202,7 +202,7 @@ export function InfoText({ md, className, style }: { md: string; className?: str
             return (
               <ol key={i} dir="auto">
                 {b.items.map((it, j) => (
-                  <li key={j}>{renderInline(it)}</li>
+                  <li key={j} dir="auto">{renderInline(it)}</li>
                 ))}
               </ol>
             );

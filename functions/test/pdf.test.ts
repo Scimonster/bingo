@@ -1,0 +1,102 @@
+/**
+ * Renders a real PDF with a local Chrome. Needs no emulators; skipped when no Chrome is found.
+ * Set PDF_OUT=/path/file.pdf to keep the output for visual inspection.
+ */
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { describe, expect, it } from "vitest";
+import { FREE, type GameSettings, type PrintLayout } from "@bingo/core";
+import { heeboFontCssFrom } from "../src/pdf/fontCss";
+import { buildSheetsHtml, renderSheetsPdf, type PdfInput } from "../src/pdf/render";
+
+const chrome = [process.env.CHROME_PATH, "/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"].find(
+  (p): p is string => !!p && existsSync(p),
+);
+
+const require = createRequire(import.meta.url);
+const font = (name: string) =>
+  readFileSync(require.resolve(`@fontsource/heebo/files/heebo-${name}-normal.woff2`)).toString("base64");
+
+const svgImage = (fill: string, label: string) =>
+  `data:image/svg+xml;base64,${Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80"><rect width="120" height="80" rx="10" fill="${fill}"/><circle cx="40" cy="40" r="22" fill="#fff"/><text x="70" y="50" font-size="28" fill="#fff">${label}</text></svg>`,
+  ).toString("base64")}`;
+
+const texts = [
+  "תפוח", "Banana", "אבטיח אדום וענק", "Kiwi", "רימון", "Grapes", "מנגו", "Strawberry fields forever",
+  "לימון", "Pear", "שזיף", "Cherry", "אננס", "Fig", "תמר", "Peach", "קלמנטינה", "Plum", "פפאיה", "Lime",
+  "Ice cream sandwich with sprinkles on top", "ענבים ירוקים", "Coconut", "אגס", "Melon", "פסיפלורה", "Apricot",
+  "Watermelon 🍉", "חבוש", "Blueberry",
+];
+const items: PdfInput["items"] = Object.fromEntries(texts.map((t, i) => [`t${i}`, { type: "text" as const, text: t }]));
+items.img1 = { type: "image", storagePath: "users/u/images/1", text: "חתול" };
+items.img2 = { type: "image", storagePath: "users/u/images/2" };
+const ids = Object.keys(items);
+
+const settings: GameSettings = {
+  rows: 5,
+  cols: 5,
+  boardsPerSheet: 3,
+  freeSpace: { enabled: true, row: 2, col: 2 },
+};
+const printLayout: PrintLayout = {
+  heading: "בינגו משפחתי — Family Bingo Night",
+  slotLabels: ["משחק 1", "Round two", ""],
+  infoText:
+    "**ברוכים הבאים!** סמנו כל פריט שהוכרז.\nהראשון שמשלים *שורה* צועק בינגו.\n\n- Mark each item when it is called\n- Show your sheet to the host\n\n1. פרס ראשון: עוגה\n2. Second prize: a <b>mug</b>",
+  paperSize: "A4",
+  orientation: "landscape",
+  arrangement: "row",
+  marginMm: 10,
+};
+
+function board(seed: number): string[] {
+  const cells: string[] = [];
+  for (let i = 0; i < 25; i++) cells.push(ids[(i * 7 + seed * 11) % ids.length]!);
+  cells[12] = FREE;
+  return cells;
+}
+
+const input: PdfInput = {
+  gameId: "game123",
+  game: { playerLanguage: "he", settings, printLayout },
+  sheets: [1, 2, 3].map((serial) => ({ serial, boards: [0, 1, 2].map((s) => board(serial * 3 + s)) })),
+  items,
+  images: { "users/u/images/1": svgImage("#7c3aed", "cat"), "users/u/images/2": svgImage("#0e9f6e", "dog") },
+  appOrigin: "https://bingo-5717e.web.app",
+  fontCss: heeboFontCssFrom({
+    hebrew400: font("hebrew-400"),
+    hebrew700: font("hebrew-700"),
+    latin400: font("latin-400"),
+    latin700: font("latin-700"),
+  }),
+};
+
+describe("PDF export rendering", () => {
+  it("builds HTML with QR links and escaped user text", async () => {
+    const html = await buildSheetsHtml(input);
+    expect(html).toContain('<html lang="he" dir="rtl">');
+    expect(html.match(/class="bs-page /g)).toHaveLength(3);
+    expect(html).not.toContain("<b>mug</b>");
+    expect(html).toContain("data:image/svg+xml;base64");
+  });
+
+  it.skipIf(!chrome)(
+    "renders a 3-page PDF with a local Chrome",
+    async () => {
+      const pdf = await renderSheetsPdf(input, { executablePath: chrome });
+      if (process.env.PDF_OUT) {
+        writeFileSync(process.env.PDF_OUT, pdf);
+        writeFileSync(`${process.env.PDF_OUT}.html`, await buildSheetsHtml(input));
+      }
+      const text = Buffer.from(pdf).toString("latin1");
+      expect(text.startsWith("%PDF-")).toBe(true);
+      expect(text.match(/\/Type\s*\/Page[^s]/g)).toHaveLength(3);
+      // A4 landscape ≈ 841.9 × 595.3 pt (Chrome rounds to whole CSS pixels)
+      const box = /\/MediaBox\s*\[\s*0 0 ([\d.]+) ([\d.]+)\s*\]/.exec(text);
+      expect(Number(box?.[1])).toBeCloseTo(841.9, 0);
+      expect(Math.abs(Number(box?.[2]) - 595.3)).toBeLessThan(1);
+    },
+    120_000,
+  );
+});

@@ -133,7 +133,7 @@ describe("InfoText", () => {
     expect(html).toContain("<b>Rules</b>");
     expect(html).toContain("<i>simple</i>");
     expect(html).toContain("<br/>");
-    expect(html).toMatch(/<ul dir="auto"><li>one<\/li><li>two<\/li><\/ul>/);
+    expect(html).toMatch(/<ul dir="auto"><li dir="auto">one<\/li><li dir="auto">two<\/li><\/ul>/);
     expect(html).toContain("<ol");
     expect(html).not.toContain("<img");
     expect(html).toContain("&lt;img");

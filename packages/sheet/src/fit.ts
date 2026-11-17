@@ -4,14 +4,26 @@
  * a phone, on screen and in the PDF — no DOM measuring, server and browser agree.
  */
 
-/** Average glyph advance as a fraction of the font size (Heebo, mixed Hebrew/Latin). */
-const CHAR_EM = 0.56;
+/** Approximate glyph advance in em for Heebo semibold/bold. */
+function charEm(ch: string): number {
+  if (/[ilj.,'!|:;\u05D5\u05D9\u05DF\u05F3]/.test(ch)) return 0.3;
+  if (/[ftrI()\-\u05D2\u05D6\u05E0]/.test(ch)) return 0.4;
+  if (/[mwMW@]/.test(ch)) return 0.88;
+  if (/[A-Z]/.test(ch)) return 0.68;
+  if (/[0-9]/.test(ch)) return 0.58;
+  if (/[\u0590-\u05FF]/.test(ch)) return 0.6;
+  if (/[a-z]/.test(ch)) return 0.57;
+  if (/\p{Extended_Pictographic}/u.test(ch)) return 1.2;
+  return 0.62;
+}
+const SPACE_EM = 0.25;
 const LINE_EM = 1.12;
-/** Usable fraction of the cell edge after padding. */
-const USABLE = 0.86;
+/** Usable fraction of the cell content box (cqi is relative to the content box, inside padding). */
+const USABLE = 0.94;
 const MAX_FRACTION = 0.3;
 const MIN_FRACTION = 0.06;
 
+/** Greedy wrap of words (widths in em) into lines of `capacity` em. */
 function lineCount(words: number[], capacity: number): number {
   let lines = 1;
   let used = 0;
@@ -23,7 +35,7 @@ function lineCount(words: number[], capacity: number): number {
       used = w % capacity || capacity;
       continue;
     }
-    const need = used === 0 ? w : used + 1 + w;
+    const need = used === 0 ? w : used + SPACE_EM + w;
     if (need <= capacity) used = need;
     else {
       lines++;
@@ -32,6 +44,8 @@ function lineCount(words: number[], capacity: number): number {
   }
   return lines;
 }
+
+const wordEm = (w: string) => [...w].reduce((n, ch) => n + charEm(ch), 0);
 
 /**
  * Font size for `text` in a square cell, as a fraction of the cell width (0.06–0.3).
@@ -42,15 +56,15 @@ export function fitFraction(text: string, heightRatio = 1, widthRatio = 1): numb
     .trim()
     .split(/\s+/)
     .filter(Boolean)
-    .map((w) => [...w].length);
+    .map(wordEm);
   if (!words.length) return MAX_FRACTION;
   const w = USABLE * widthRatio;
   const h = USABLE * heightRatio;
+  const longest = Math.max(...words);
   for (let f = MAX_FRACTION; f > MIN_FRACTION; f -= 0.005) {
-    const capacity = Math.max(1, Math.floor(w / (CHAR_EM * f)));
-    const longest = Math.max(...words);
+    const capacity = w / f; // line width in em
     // Prefer not to break words: shrink until the longest word fits on one line.
-    if (longest > capacity && f > 0.1) continue;
+    if (longest > capacity && f > 0.08) continue;
     if (lineCount(words, capacity) * LINE_EM * f <= h) return Math.round(f * 1000) / 1000;
   }
   return MIN_FRACTION;
