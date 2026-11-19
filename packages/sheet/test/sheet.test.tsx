@@ -181,6 +181,47 @@ describe("SheetLayout", () => {
     expect(html).not.toContain("<header");
   });
 
+  it("places boards and the info panel in the layout's order", () => {
+    const html = renderToStaticMarkup(
+      <SheetLayout {...props({ printLayout: layout({ arrangement: "grid", order: [-1, 2, 0, 1], infoText: "Hello" }) })} />,
+    );
+    expect(html.indexOf("bs-meta")).toBeLessThan(html.indexOf("bs-quad"));
+    const labels = [...html.matchAll(/aria-label="(Game \d)"/g)].map((m) => m[1]);
+    expect(labels).toEqual(["Game 3", "Game 1", "Game 2"]);
+    const row = renderToStaticMarkup(<SheetLayout {...props({ printLayout: layout({ order: [1, 2, 0] }) })} />);
+    expect([...row.matchAll(/aria-label="(Game \d)"/g)].map((m) => m[1])).toEqual(["Game 2", "Game 3", "Game 1"]);
+  });
+
+  it("hides the QR code when showQr is false", () => {
+    for (const arrangement of ["row", "grid"] as const) {
+      const html = renderToStaticMarkup(<SheetLayout {...props({ printLayout: layout({ arrangement, showQr: false }) })} />);
+      expect(html).not.toContain("bs-qr");
+      expect(html).toContain("№ 042");
+    }
+  });
+
+  it("stretches boards to non-square cells", () => {
+    const html = renderToStaticMarkup(<SheetLayout {...props({ printLayout: layout({ stretch: true }) })} />);
+    const [, w, h] = html.match(/class="bs-board-box" style="width:([\d.]+)mm;height:([\d.]+)mm"/)!;
+    expect(Number(h)).toBeGreaterThan(Number(w));
+  });
+
+  it("draws a background colour and image behind the content", () => {
+    const html = renderToStaticMarkup(
+      <SheetLayout
+        {...props({
+          printLayout: layout({ backgroundColor: "#ffeeaa", backgroundImage: "users/u/images/bg", backgroundOpacity: 0.4 }),
+          backgroundUrl: "https://img.test/bg.webp",
+        })}
+      />,
+    );
+    expect(html).toContain("bs-page--bg");
+    expect(html).toContain("background-color:#ffeeaa");
+    expect(html).toMatch(/class="bs-bg"[^>]*background-image:url\(&quot;https:\/\/img.test\/bg.webp&quot;\);opacity:0.4/);
+    const plain = renderToStaticMarkup(<SheetLayout {...props({ printLayout: layout({ backgroundColor: "red" }) })} />);
+    expect(plain).not.toContain("bs-page--bg");
+  });
+
   it("renders header, labels and info, with Hebrew direction", () => {
     const html = renderToStaticMarkup(
       <SheetLayout

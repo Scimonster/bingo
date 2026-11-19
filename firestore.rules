@@ -123,7 +123,8 @@ service cloud.firestore {
     function validPrintLayout(p) {
       return p is map
         && p.keys().hasAll(['slotLabels', 'infoText', 'paperSize', 'orientation', 'arrangement', 'marginMm'])
-        && p.keys().hasOnly(['heading', 'slotLabels', 'infoText', 'paperSize', 'orientation', 'arrangement', 'marginMm'])
+        && p.keys().hasOnly(['heading', 'slotLabels', 'infoText', 'paperSize', 'orientation', 'arrangement', 'marginMm',
+                             'order', 'showQr', 'stretch', 'backgroundColor', 'backgroundImage', 'backgroundOpacity'])
         && (!('heading' in p) || isStr(p.heading, 0, 120))
         && p.slotLabels is list
         && p.slotLabels.size() <= 4
@@ -136,7 +137,15 @@ service cloud.firestore {
         && p.orientation in ['portrait', 'landscape']
         && p.arrangement in ['row', 'column', 'grid', 'single']
         && (p.marginMm is int || p.marginMm is float)
-        && p.marginMm >= 0 && p.marginMm <= 30;
+        && p.marginMm >= 0 && p.marginMm <= 30
+        // order: block ids (slots 0–3, -1 = info panel); a bad permutation renders the default.
+        && (!('order' in p) || (p.order is list && p.order.size() <= 5))
+        && (!('showQr' in p) || p.showQr is bool)
+        && (!('stretch' in p) || p.stretch is bool)
+        && (!('backgroundColor' in p) || (p.backgroundColor is string && p.backgroundColor.matches('^#[0-9a-fA-F]{6}$')))
+        && (!('backgroundImage' in p) || validStoragePath(p.backgroundImage))
+        && (!('backgroundOpacity' in p) || ((p.backgroundOpacity is int || p.backgroundOpacity is float)
+            && p.backgroundOpacity >= 0.05 && p.backgroundOpacity <= 1));
     }
 
     // Pattern: { id, name, cells?: number[], group? } with cells or a group. Kept deliberately

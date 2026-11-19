@@ -9,7 +9,7 @@ import {
 import { SheetLayout, type SheetLayoutProps } from "@bingo/sheet";
 import { Alert, Button, Card, Input, Label, Spinner, cn } from "../../components/ui";
 import { ConfirmDialog, EmptyState } from "../../components/setup/common";
-import { PrintPortal, ScaledSheet, SetupSheetCss, useQrSvg, useSheetResolver } from "../../components/setup/SheetPreview";
+import { FullSizePreview, PrintPortal, ScaledSheet, SetupSheetCss, useBackgroundUrl, useQrSvg, useSheetResolver } from "../../components/setup/SheetPreview";
 import { parseSerialRange, syncSlotLabels } from "../../components/setup/helpers";
 import { useCollection } from "../../lib/hooks";
 import { db, storage } from "../../lib/firebase";
@@ -48,7 +48,7 @@ export function SheetsTab(props: TabProps) {
       <div className="grid gap-4 lg:grid-cols-[minmax(20rem,26rem)_1fr]">
         <Card className="space-y-3 self-start">
           <h2 className="text-lg font-semibold">Print layout</h2>
-          <PrintLayoutEditor layout={draft} settings={game.settings} onChange={setDraft} />
+          <PrintLayoutEditor layout={draft} settings={game.settings} uid={props.user.uid} onChange={setDraft} />
           <SaveLayoutBar gameId={gameId} draft={draft} dirty={dirty} onDiscard={() => setDraft(stored)} />
         </Card>
         <Card className="min-w-0 space-y-3">
@@ -187,6 +187,8 @@ function Samples({ game, items, layout }: TabProps & { layout: PrintLayout }) {
   const [idx, setIdx] = useState(0);
   const resolve = useSheetResolver(game, items);
   const qr = useQrSvg("SAMPLE");
+  const backgroundUrl = useBackgroundUrl(layout);
+  const [full, setFull] = useState(false);
   const itemIds = useMemo(() => items.map((i) => i.id), [items]);
   const result = useMemo(() => {
     try {
@@ -204,7 +206,7 @@ function Samples({ game, items, layout }: TabProps & { layout: PrintLayout }) {
     );
   }
   const sheet = result.sheets[Math.min(idx, result.sheets.length - 1)]!;
-  const p: SheetLayoutProps = { serial: 0, boards: sheet.boards.map((b) => b.cells), settings: game.settings, printLayout: layout, lang: game.playerLanguage, resolve, qrSvg: qr };
+  const p: SheetLayoutProps = { serial: 0, boards: sheet.boards.map((b) => b.cells), settings: game.settings, printLayout: layout, lang: game.playerLanguage, resolve, qrSvg: qr, backgroundUrl };
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -218,11 +220,15 @@ function Samples({ game, items, layout }: TabProps & { layout: PrintLayout }) {
           <Button size="sm" variant="outline" onClick={() => setSeed((s) => (s * 1103515245 + 12345) >>> 1)}>
             Reshuffle
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setFull(true)}>
+            Full size
+          </Button>
         </div>
       </div>
       <div className="rounded-lg bg-slate-100 p-3">
         <ScaledSheet props={p} sample maxHeightPx={720} />
       </div>
+      {full && <FullSizePreview props={p} sample onClose={() => setFull(false)} />}
     </div>
   );
 }
@@ -252,6 +258,8 @@ function Browse({ gameId, game, items, layout, sheets, loading }: TabProps & { l
   const boards = useBoards(gameId, sheet);
   const resolve = useSheetResolver(game, items);
   const printResolve = useSheetResolver(game, items, "print");
+  const backgroundUrl = useBackgroundUrl(layout);
+  const [full, setFull] = useState(false);
   const qr = useQrSvg(sheet ? `${location.origin}${sheetQrPath(gameId, sheet.serial)}` : "");
   const pages = Math.ceil(sheets.length / PAGE_SIZE);
 
@@ -263,7 +271,7 @@ function Browse({ gameId, game, items, layout, sheets, loading }: TabProps & { l
     setSel(c);
     setPage(Math.floor(c / PAGE_SIZE));
   };
-  const p: SheetLayoutProps | null = sheet && boards.data ? { serial: sheet.serial, boards: boards.data, settings: game.settings, printLayout: layout, lang: game.playerLanguage, resolve, qrSvg: qr } : null;
+  const p: SheetLayoutProps | null = sheet && boards.data ? { serial: sheet.serial, boards: boards.data, settings: game.settings, printLayout: layout, lang: game.playerLanguage, resolve, qrSvg: qr, backgroundUrl } : null;
 
   return (
     <div className="space-y-3">
@@ -289,7 +297,10 @@ function Browse({ gameId, game, items, layout, sheets, loading }: TabProps & { l
             Go
           </Button>
         </form>
-        <Button size="sm" className="ms-auto" disabled={!p} onClick={() => setPrinting(true)}>
+        <Button size="sm" variant="outline" className="ms-auto" disabled={!p} onClick={() => setFull(true)}>
+          Full size
+        </Button>
+        <Button size="sm" disabled={!p} onClick={() => setPrinting(true)}>
           Print this sheet
         </Button>
       </div>
@@ -323,6 +334,7 @@ function Browse({ gameId, game, items, layout, sheets, loading }: TabProps & { l
           )}
         </div>
       </div>
+      {full && p && <FullSizePreview props={p} onClose={() => setFull(false)} />}
       {printing && p && (
         <PrintPortal onDone={() => setPrinting(false)}>
           <SheetLayout {...p} resolve={printResolve} />

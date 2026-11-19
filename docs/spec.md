@@ -193,7 +193,7 @@ Three top-level concepts, each justified by a requirement: a game holds content;
 games/{gameId}
   ownerId, title, createdAt, playerLanguage: "he"|"en"
   settings:    { rows, cols, freeSpace: { enabled, row, col, content?: { type: "text"|"image", text?, storagePath? } }, boardsPerSheet }
-  printLayout: { heading?, slotLabels: ["Game 1", ...], infoText, paperSize, orientation, arrangement: "row"|"column"|"grid"|"single", marginMm }
+  printLayout: { heading?, slotLabels: ["Game 1", ...], infoText, paperSize, orientation, arrangement: "row"|"column"|"grid"|"single", marginMm, order?: number[] /* slots, -1 = grid info panel */, showQr?, stretch?, backgroundColor?, backgroundImage?, backgroundOpacity? }
   contentLocked ⚙️                       true once sheets exist
   clonedFrom? ⚙️
 
@@ -632,6 +632,16 @@ header on top, info below |
 Paper sizes: A5, A4, A3, Letter, Legal and Tabloid (11×17 in), each in portrait or landscape.
 - 
 Margins default to 10 mm; the preview flags layouts whose cells come out under about 12 mm.
+- 
+Block order: the host can reorder the boards (and, in the grid, the info panel) on the page. Positions fill in reading order, so they mirror in Hebrew.
+- 
+The QR code can be hidden. Players then can't scan to link a paper sheet; the serial still identifies it.
+- 
+"Stretch boards" fills the available space, so cells may be non-square; without info text it also reclaims the info area. Cell text fits the cell's actual shape.
+- 
+Background: an optional page colour and/or image (the print variant, cropped to cover the page, with adjustable opacity). Boards keep white cells, and the header, labels and info get a light backing so they stay readable.
+- 
+The preview can open a sheet at actual size (1 mm = 1 CSS mm) or fitted to the window.
 - 
 Rough cell sizes at 5×5: grid 2×2 on A4 about 17 mm, on A3 about 25 mm.
 ## Language and RTL

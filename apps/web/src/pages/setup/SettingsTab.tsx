@@ -64,6 +64,7 @@ export function SettingsTab({ gameId, game, user, items }: TabProps) {
         update.printLayout = clean({
           ...pl,
           slotLabels: syncSlotLabels(pl.slotLabels, n),
+          order: undefined,
           arrangement: n === 1 ? "single" : pl.arrangement === "single" ? "row" : pl.arrangement === "grid" && n < 3 ? "row" : pl.arrangement,
         });
       }

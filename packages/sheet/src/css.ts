@@ -187,7 +187,7 @@ button.bs-cell:active { filter: brightness(0.94); }
 .bs-label > span { overflow: hidden; text-overflow: ellipsis; }
 .bs-board-box { flex: none; }
 
-.bs-grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.bs-grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; grid-auto-flow: row dense; }
 .bs-quad { min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .bs-meta {
   min-width: 0;
@@ -219,6 +219,31 @@ button.bs-cell:active { filter: brightness(0.94); }
 .bs-md li { margin: 0; }
 .bs-md > :last-child { margin-bottom: 0; }
 .bs-md b { font-weight: 700; }
+
+/* ---------- Page background ---------- */
+.bs-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.bs-page > :not(.bs-bg):not(style) { position: relative; z-index: 1; }
+/* Keep text readable over a background: light backing behind header, labels and info. */
+.bs-page--bg .bs-header,
+.bs-page--bg .bs-meta,
+.bs-page--bg .bs-info {
+  background: rgba(255, 255, 255, 0.86);
+  border-radius: 2mm;
+  padding-inline: 2.5mm;
+}
+.bs-page--bg .bs-header { padding-top: 1mm; }
+.bs-page--bg .bs-info { padding-bottom: 1.5mm; }
+.bs-page--bg .bs-label > span { background: rgba(255, 255, 255, 0.86); border-radius: 1mm; padding: 0.3mm 1.5mm; }
 
 /* ---------- Screen preview / browser print ---------- */
 @media screen {

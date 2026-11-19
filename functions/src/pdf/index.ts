@@ -77,11 +77,12 @@ export async function exportSheetsPdfHandler(ctx: Ctx, data: unknown): Promise<E
     items[d.id] = { type: it.type, text: it.text, storagePath: it.storagePath };
   }
 
-  // Only fetch images that appear on the exported boards (plus the free space).
+  // Only fetch images that appear on the exported boards (plus the free space and background).
   const used = new Set<string>();
   for (const s of sheets) for (const b of s.boards) for (const id of b) if (id !== FREE && items[id]?.storagePath) used.add(items[id]!.storagePath!);
   const free = game.settings.freeSpace;
   if (free.enabled && free.content?.type === "image" && free.content.storagePath) used.add(free.content.storagePath);
+  if (game.printLayout.backgroundImage) used.add(game.printLayout.backgroundImage);
   const images = await loadImages([...used]);
 
   const pdf = await renderSheetsPdf({

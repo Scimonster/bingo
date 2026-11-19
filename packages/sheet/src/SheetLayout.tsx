@@ -1,5 +1,7 @@
 import {
+  blockOrder,
   formatSerial,
+  INFO_BLOCK,
   GAP_MM,
   HEADER_MM,
   LABEL_MM,
@@ -24,6 +26,8 @@ export interface SheetLayoutProps {
   resolve: Resolve;
   /** Trusted SVG markup from `qrSvg()` (inserted as HTML). */
   qrSvg: string;
+  /** Resolved URL (or data URL) of `printLayout.backgroundImage`. */
+  backgroundUrl?: string;
   className?: string;
   style?: CSSProperties;
 }
@@ -86,6 +90,10 @@ export function SheetLayout(props: SheetLayoutProps) {
   const n = Math.max(1, boards.length);
   const arrangement = n === 1 ? "single" : pl.arrangement;
   const margin = pl.marginMm;
+  const heading = pl.heading?.trim() ?? "";
+  const info = pl.infoText?.trim() ?? "";
+  const showQr = pl.showQr !== false;
+  const order = blockOrder(pl.order, arrangement, n);
   const m = layoutMetrics({
     paperSize: pl.paperSize,
     orientation: pl.orientation,
@@ -94,14 +102,14 @@ export function SheetLayout(props: SheetLayoutProps) {
     boardsPerSheet: n,
     rows,
     cols,
+    stretch: !!pl.stretch,
+    hasInfo: !!info,
   });
   const { page } = m;
   const innerW = page.w - 2 * margin;
   const innerH = page.h - 2 * margin;
-  const boardW = m.cellMm * cols;
-  const boardH = m.cellMm * rows;
-  const heading = pl.heading?.trim() ?? "";
-  const info = pl.infoText?.trim() ?? "";
+  const { boardW, boardH } = m;
+  const cellAspect = m.cellW > 0 ? m.cellH / m.cellW : 1;
   const t = STRINGS[lang];
   const labelFont = Math.min(4.4, Math.max(2.8, LABEL_MM * 0.6));
 
@@ -121,20 +129,36 @@ export function SheetLayout(props: SheetLayoutProps) {
             variant="print"
             label={label}
             freeLabel={t.free}
+            cellAspect={cellAspect}
           />
         </div>
       </div>
     );
   };
 
+  const bgColor = pl.backgroundColor && /^#[0-9a-f]{6}$/i.test(pl.backgroundColor) ? pl.backgroundColor : undefined;
+  const bgUrl = pl.backgroundImage ? props.backgroundUrl : undefined;
+  const hasBg = !!(bgColor || pl.backgroundImage);
   const pageStyle: CSSProperties = {
     width: mm(page.w),
     height: mm(page.h),
     padding: mm(margin),
+    ...(bgColor ? { backgroundColor: bgColor } : null),
     ...props.style,
   };
-  const pageCls = ["bs-page", `bs-page--${arrangement}`, props.className].filter(Boolean).join(" ");
-  const pageRule = <style>{`@page{size:${mm(page.w)} ${mm(page.h)};margin:0}`}</style>;
+  const pageCls = ["bs-page", `bs-page--${arrangement}`, hasBg && "bs-page--bg", props.className].filter(Boolean).join(" ");
+  const pageRule = (
+    <>
+      <style>{`@page{size:${mm(page.w)} ${mm(page.h)};margin:0}`}</style>
+      {bgUrl ? (
+        <div
+          className="bs-bg"
+          aria-hidden="true"
+          style={{ backgroundImage: `url("${bgUrl.replace(/["\\\n]/g, "")}")`, opacity: Math.min(1, Math.max(0.05, pl.backgroundOpacity ?? 1)) }}
+        />
+      ) : null}
+    </>
+  );
 
   if (arrangement === "grid") {
     const qW = (innerW - GAP_MM) / 2;
@@ -150,13 +174,13 @@ export function SheetLayout(props: SheetLayoutProps) {
             </h1>
             <div className="bs-id">
               <Serial serial={serial} fontMm={5.5} />
-              <Qr svg={qrSvg} sizeMm={qr} />
+              {showQr ? <Qr svg={qrSvg} sizeMm={qr} /> : null}
             </div>
           </header>
           <div className="bs-grid" style={{ gap: mm(GAP_MM) }}>
-            {boards.slice(0, 4).map((cells, i) => (
+            {order.map((i) => (
               <div className="bs-quad" key={i}>
-                {slot(cells, i)}
+                {slot(boards[i] ?? [], i)}
               </div>
             ))}
           </div>
@@ -165,31 +189,41 @@ export function SheetLayout(props: SheetLayoutProps) {
     }
     const qH = (innerH - GAP_MM) / 2;
     const qrSize = Math.min(32, qH * 0.34, qW * 0.4);
+    const serialFont = Math.min(12, qrSize * 0.4);
+    const idH = showQr ? qrSize : serialFont * 1.2;
     const headingFont = heading ? fitLineFont(heading, qW - 8, 3, 7, 3.5) : 0;
     const headingH = heading ? headingFont * 1.15 * Math.min(3, Math.ceil(([...heading].length * headingFont * 0.55) / (qW - 8))) : 0;
-    const infoH = qH - 4 - headingH - qrSize - (heading ? 3 : 0) - 3 - 2.3 - 1;
+    const infoH = qH - 4 - headingH - idH - (heading ? 3 : 0) - 3 - 2.3 - 1;
     const infoFont = info ? fitInfoFontMm(infoLengths(info), qW - 8, infoH) : 0;
+    const meta = (
+      <>
+        {heading ? (
+          <h1 className="bs-heading" dir="auto" style={{ fontSize: mm(headingFont) }}>
+            {heading}
+          </h1>
+        ) : null}
+        <div className="bs-meta-id">
+          <Serial serial={serial} fontMm={serialFont} />
+          {showQr ? <Qr svg={qrSvg} sizeMm={qrSize} /> : null}
+        </div>
+        {info ? <InfoText md={info} className="bs-info" style={{ fontSize: mm(infoFont) }} /> : null}
+      </>
+    );
     return (
       <div className={pageCls} style={pageStyle} lang={lang} dir={lang === "he" ? "rtl" : "ltr"}>
         {pageRule}
         <div className="bs-grid" style={{ gap: mm(GAP_MM) }}>
-          {boards.map((cells, i) => (
-            <div className="bs-quad" key={i}>
-              {slot(cells, i)}
-            </div>
-          ))}
-          <section className="bs-meta" style={n === 2 ? { gridColumn: "1 / -1" } : undefined}>
-            {heading ? (
-              <h1 className="bs-heading" dir="auto" style={{ fontSize: mm(headingFont) }}>
-                {heading}
-              </h1>
-            ) : null}
-            <div className="bs-meta-id">
-              <Serial serial={serial} fontMm={Math.min(12, qrSize * 0.4)} />
-              <Qr svg={qrSvg} sizeMm={qrSize} />
-            </div>
-            {info ? <InfoText md={info} className="bs-info" style={{ fontSize: mm(infoFont) }} /> : null}
-          </section>
+          {order.map((i) =>
+            i === INFO_BLOCK ? (
+              <section className="bs-meta" key="meta" style={n === 2 ? { gridColumn: "1 / -1" } : undefined}>
+                {meta}
+              </section>
+            ) : (
+              <div className="bs-quad" key={i}>
+                {slot(boards[i] ?? [], i)}
+              </div>
+            ),
+          )}
         </div>
       </div>
     );
@@ -199,7 +233,7 @@ export function SheetLayout(props: SheetLayoutProps) {
   const headerH = HEADER_MM - 2;
   const qrSize = headerH - 3;
   const serialFont = 9;
-  const headingFont = heading ? fitLineFont(heading, innerW - qrSize - 45, 2, 9, 4) : 0;
+  const headingFont = heading ? fitLineFont(heading, innerW - (showQr ? qrSize : 0) - 45, 2, 9, 4) : 0;
   const boardsH =
     arrangement === "column" ? n * (LABEL_MM + boardH) + (n - 1) * GAP_MM : LABEL_MM + boardH;
   const infoH = innerH - HEADER_MM - boardsH - 4;
@@ -213,14 +247,14 @@ export function SheetLayout(props: SheetLayoutProps) {
         </h1>
         <div className="bs-id">
           <Serial serial={serial} fontMm={serialFont} />
-          <Qr svg={qrSvg} sizeMm={qrSize} />
+          {showQr ? <Qr svg={qrSvg} sizeMm={qrSize} /> : null}
         </div>
       </header>
       <div
         className={`bs-boards bs-boards--${arrangement === "column" ? "column" : "row"}`}
         style={{ gap: mm(GAP_MM) }}
       >
-        {boards.map(slot)}
+        {order.map((i) => slot(boards[i] ?? [], i))}
       </div>
       {info ? (
         <InfoText md={info} className="bs-info" style={{ fontSize: mm(infoFont), maxHeight: mm(infoH + 4) }} />

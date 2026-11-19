@@ -179,6 +179,19 @@ describe("games: create", () => {
     await assertSucceeds(create(OWNER, newGame({ printLayout: noHeading })));
   });
 
+  it("validates print layout order, QR, stretch and background", async () => {
+    await assertSucceeds(
+      create(OWNER, newGame({ printLayout: printLayout({ order: [-1, 2, 0, 1], showQr: false, stretch: true, backgroundColor: "#AABBCC", backgroundImage: "users/u/images/bg", backgroundOpacity: 0.5 }) })),
+    );
+    await assertFails(create(OWNER, newGame({ printLayout: printLayout({ order: [0, 1, 2, 3, 4, 5] }) })));
+    await assertFails(create(OWNER, newGame({ printLayout: printLayout({ showQr: "no" }) })));
+    await assertFails(create(OWNER, newGame({ printLayout: printLayout({ stretch: 1 }) })));
+    await assertFails(create(OWNER, newGame({ printLayout: printLayout({ backgroundColor: "red" }) })));
+    await assertFails(create(OWNER, newGame({ printLayout: printLayout({ backgroundImage: "elsewhere/x" }) })));
+    await assertFails(create(OWNER, newGame({ printLayout: printLayout({ backgroundOpacity: 0 }) })));
+    await assertFails(create(OWNER, newGame({ printLayout: printLayout({ backgroundOpacity: 1.5 }) })));
+  });
+
   it("limits custom patterns to a list of at most 20", async () => {
     await assertSucceeds(create(OWNER, newGame({ customPatterns: Array.from({ length: 20 }, (_, i) => pattern(i)) })));
     await assertFails(create(OWNER, newGame({ customPatterns: Array.from({ length: 21 }, (_, i) => pattern(i)) })));

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { pageSizeMm, type Game, type Item } from "@bingo/core";
+import { pageSizeMm, type Game, type Item, type PrintLayout } from "@bingo/core";
 import { SheetLayout, SheetStyles, makeResolver, qrSvg, type Resolve, type SheetLayoutProps } from "@bingo/sheet";
 import { useImageUrls } from "../../lib/hooks";
 
@@ -14,6 +14,12 @@ export function useSheetResolver(game: Pick<Game, "settings">, items: Item[], va
     const map = Object.fromEntries(items.map((i) => [i.id, { type: i.type, text: i.text, storagePath: i.storagePath }]));
     return makeResolver(map, free, (p) => urls[p]);
   }, [items, free, urls]);
+}
+
+/** URL of the layout's background image (print variant), once loaded. */
+export function useBackgroundUrl(layout: Pick<PrintLayout, "backgroundImage">): string | undefined {
+  const urls = useImageUrls([layout.backgroundImage], "print");
+  return layout.backgroundImage ? urls[layout.backgroundImage] : undefined;
 }
 
 /** QR SVG markup for a text (async). */
@@ -58,6 +64,80 @@ export function ScaledSheet({ props, sample, maxHeightPx }: { props: SheetLayout
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Full-window preview of one sheet, at 100% (1 mm = 1 CSS mm, the sheet's printed size on a
+ * standard display) or fitted to the window.
+ */
+export function FullSizePreview({ props, sample, onClose }: { props: SheetLayoutProps; sample?: boolean; onClose: () => void }) {
+  const [fit, setFit] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const page = pageSizeMm(props.printLayout.paperSize, props.printLayout.orientation);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCloseRef.current();
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, []);
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="Full-size sheet preview" className="fixed inset-0 z-50 flex flex-col bg-slate-800/95">
+      <div className="flex flex-none items-center gap-2 bg-slate-900 px-4 py-2 text-sm text-white">
+        <span className="font-medium">
+          {props.printLayout.paperSize} {props.printLayout.orientation} · {Math.round(page.w)} × {Math.round(page.h)} mm
+        </span>
+        <div className="ms-auto flex rounded-lg bg-slate-700 p-0.5">
+          {([false, true] as const).map((f) => (
+            <button key={String(f)} type="button" aria-pressed={fit === f} onClick={() => setFit(f)} className={fit === f ? "rounded-md bg-white px-3 py-1 text-slate-900" : "px-3 py-1 text-slate-200"}>
+              {f ? "Fit to window" : "Actual size"}
+            </button>
+          ))}
+        </div>
+        <button ref={closeRef} type="button" onClick={onClose} className="rounded-md px-3 py-1 hover:bg-slate-700">
+          Close
+        </button>
+      </div>
+      {fit ? (
+        <div className="min-h-0 flex-1 p-4">
+          <FitSheet props={props} sample={sample} />
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-auto p-6">
+          <SheetStyles />
+          <div className={sample ? "setup-sample mx-auto w-fit" : "mx-auto w-fit"}>
+            <SheetLayout {...props} />
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body,
+  );
+}
+
+/** A sheet scaled to fit both dimensions of its container. */
+function FitSheet({ props, sample }: { props: SheetLayoutProps; sample?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [h, setH] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setH(el.clientHeight));
+    ro.observe(el);
+    setH(el.clientHeight);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="h-full">
+      {h > 0 && <ScaledSheet props={props} sample={sample} maxHeightPx={h} />}
     </div>
   );
 }

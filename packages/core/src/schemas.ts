@@ -31,6 +31,12 @@ export const printLayoutSchema = z.object({
   orientation: z.enum(["portrait", "landscape"]),
   arrangement: z.enum(["row", "column", "grid", "single"]),
   marginMm: z.number().min(LIMITS.marginMinMm).max(LIMITS.marginMaxMm),
+  order: z.array(z.number().int().min(-1).max(LIMITS.boardsPerSheetMax - 1)).max(LIMITS.boardsPerSheetMax + 1).optional(),
+  showQr: z.boolean().optional(),
+  stretch: z.boolean().optional(),
+  backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  backgroundImage: z.string().regex(/^users\/[^/]+\/images\/[^/]+$/).optional(),
+  backgroundOpacity: z.number().min(0.05).max(1).optional(),
 });
 
 export const patternSchema = z.object({

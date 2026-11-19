@@ -39,6 +39,21 @@ export interface PrintLayout {
   orientation: Orientation;
   arrangement: Arrangement;
   marginMm: number;
+  /**
+   * Reading order of the blocks on the page: slot indices, plus INFO_BLOCK (-1) for the grid's
+   * info panel. Missing or invalid → default order (see `blockOrder`).
+   */
+  order?: number[];
+  /** Print the QR code (default true). */
+  showQr?: boolean;
+  /** Stretch boards to fill the space (cells may be non-square). Default false. */
+  stretch?: boolean;
+  /** Page background colour, "#rrggbb". */
+  backgroundColor?: string;
+  /** Page background image: users/{uid}/images/{imageId} (print variant is used). */
+  backgroundImage?: string;
+  /** Background image opacity, 0.05–1 (default 1). */
+  backgroundOpacity?: number;
 }
 
 /**

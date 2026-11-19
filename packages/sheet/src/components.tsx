@@ -38,12 +38,14 @@ function Img({ url }: { url?: string }) {
 }
 
 /** Content of one cell (no wrapper): fitted text, image with caption, or the free space. */
-export function ItemCell({ view, variant = "screen" }: { view: CellView; variant?: Variant }) {
+export function ItemCell({ view, variant = "screen", aspect = 1 }: { view: CellView; variant?: Variant; aspect?: number }) {
   void variant; // sizing is relative to the cell in both variants
+  // Font sizes are a fraction of the cell width; a non-square cell scales the height budget.
+  const fit = (text: string, heightRatio = 1) => fitFontSize(text, heightRatio * aspect);
   switch (view.kind) {
     case "text":
       return (
-        <span className="bs-cell-text" dir="auto" style={{ fontSize: fitFontSize(view.text) }}>
+        <span className="bs-cell-text" dir="auto" style={{ fontSize: fit(view.text) }}>
           {view.text}
         </span>
       );
@@ -52,7 +54,7 @@ export function ItemCell({ view, variant = "screen" }: { view: CellView; variant
         <span className="bs-cell-media">
           <Img url={view.url} />
           {view.caption ? (
-            <span className="bs-cell-caption" dir="auto" style={{ fontSize: fitFontSize(view.caption, 0.3) }}>
+            <span className="bs-cell-caption" dir="auto" style={{ fontSize: fit(view.caption, 0.3) }}>
               {view.caption}
             </span>
           ) : null}
@@ -64,7 +66,7 @@ export function ItemCell({ view, variant = "screen" }: { view: CellView; variant
           <span className="bs-cell-media">
             <Img url={view.url} />
             {view.text ? (
-              <span className="bs-cell-caption" dir="auto" style={{ fontSize: fitFontSize(view.text, 0.3) }}>
+              <span className="bs-cell-caption" dir="auto" style={{ fontSize: fit(view.text, 0.3) }}>
                 {view.text}
               </span>
             ) : null}
@@ -75,7 +77,7 @@ export function ItemCell({ view, variant = "screen" }: { view: CellView; variant
         return (
           <span className="bs-cell-media">
             <Star small />
-            <span className="bs-cell-caption" dir="auto" style={{ fontSize: fitFontSize(view.text, 0.55) }}>
+            <span className="bs-cell-caption" dir="auto" style={{ fontSize: fit(view.text, 0.55) }}>
               {view.text}
             </span>
           </span>
@@ -101,6 +103,8 @@ export interface BoardGridProps {
   className?: string;
   /** Accessible name of the free space (default "Free space"). */
   freeLabel?: string;
+  /** Cell height / width when cells are not square (stretched print boards). */
+  cellAspect?: number;
 }
 
 /**
@@ -119,6 +123,7 @@ export function BoardGrid({
   label,
   className,
   freeLabel,
+  cellAspect = 1,
 }: BoardGridProps) {
   const style: CSSProperties = {
     gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
@@ -139,7 +144,7 @@ export function BoardGrid({
           .filter(Boolean)
           .join(" ");
         const name = cellLabel(view, freeLabel);
-        const content = <ItemCell view={view} variant={variant} />;
+        const content = <ItemCell view={view} variant={variant} aspect={cellAspect} />;
         if (onCellClick) {
           return (
             <button

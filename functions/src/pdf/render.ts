@@ -30,6 +30,8 @@ export async function buildSheetPages(input: PdfInput): Promise<SheetLayoutProps
   const freeContent = game.settings.freeSpace.enabled ? game.settings.freeSpace.content : undefined;
   const resolve = makeResolver(input.items, freeContent, (p) => input.images[p]);
   const origin = input.appOrigin.replace(/\/+$/, "");
+  const bg = game.printLayout.backgroundImage;
+  const backgroundUrl = bg ? input.images[bg] : undefined;
   return Promise.all(
     input.sheets.map(async (s) => ({
       serial: s.serial,
@@ -38,7 +40,8 @@ export async function buildSheetPages(input: PdfInput): Promise<SheetLayoutProps
       printLayout: game.printLayout,
       lang: game.playerLanguage,
       resolve,
-      qrSvg: await qrSvg(`${origin}${sheetQrPath(input.gameId, s.serial)}`),
+      qrSvg: game.printLayout.showQr === false ? "" : await qrSvg(`${origin}${sheetQrPath(input.gameId, s.serial)}`),
+      backgroundUrl,
     })),
   );
 }

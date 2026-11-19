@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  JOIN_CODE_ALPHABET, formatSerial, generateJoinCode, isValidJoinCode, layoutMetrics, liveRoundRequestSchema,
+  INFO_BLOCK, JOIN_CODE_ALPHABET, blockOrder, formatSerial, generateJoinCode, isValidJoinCode, layoutMetrics, liveRoundRequestSchema,
   normalizeJoinCode, parseInfoText, parseSerial, sanitizeInfoText, seededRng, shuffle, cryptoRng, roundOptionsSchema,
 } from "../src";
 
@@ -43,6 +43,33 @@ describe("layoutMetrics", () => {
   it("flags small cells for 8×8 with three boards", () => {
     const m = layoutMetrics({ paperSize: "A4", orientation: "landscape", arrangement: "row", marginMm: 10, boardsPerSheet: 3, rows: 8, cols: 8 });
     expect(m.tooSmall).toBe(true);
+  });
+  it("stretches boards to fill the box and reclaims the info area without info text", () => {
+    const base = { paperSize: "A4", orientation: "landscape", arrangement: "row", marginMm: 10, boardsPerSheet: 3, rows: 5, cols: 5 } as const;
+    const square = layoutMetrics(base);
+    const stretched = layoutMetrics({ ...base, stretch: true, hasInfo: true });
+    const noInfo = layoutMetrics({ ...base, stretch: true, hasInfo: false });
+    expect(square.cellW).toBeCloseTo(square.cellH);
+    expect(stretched.boardW).toBeCloseTo(square.boardW);
+    expect(stretched.boardH).toBeGreaterThan(square.boardH);
+    expect(noInfo.boardH).toBeGreaterThan(stretched.boardH);
+    expect(stretched.cellMm).toBeCloseTo(Math.min(stretched.cellW, stretched.cellH));
+  });
+});
+
+describe("blockOrder", () => {
+  it("defaults to slots, plus the info panel for grids with 2–3 boards", () => {
+    expect(blockOrder(undefined, "row", 3)).toEqual([0, 1, 2]);
+    expect(blockOrder(undefined, "grid", 3)).toEqual([0, 1, 2, INFO_BLOCK]);
+    expect(blockOrder(undefined, "grid", 4)).toEqual([0, 1, 2, 3]);
+    expect(blockOrder([2, 0, 1], "single", 1)).toEqual([0]);
+  });
+  it("keeps valid permutations and rejects anything else", () => {
+    expect(blockOrder([INFO_BLOCK, 2, 0, 1], "grid", 3)).toEqual([INFO_BLOCK, 2, 0, 1]);
+    expect(blockOrder([2, 1, 0], "column", 3)).toEqual([2, 1, 0]);
+    expect(blockOrder([INFO_BLOCK, 1, 0], "row", 2)).toEqual([0, 1]);
+    expect(blockOrder([0, 0, 1], "row", 3)).toEqual([0, 1, 2]);
+    expect(blockOrder([1, 0], "row", 3)).toEqual([0, 1, 2]);
   });
 });
 
