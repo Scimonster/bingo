@@ -21,8 +21,28 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm test:emulators
-  build_and_deploy:
+  # Firestore/Storage rules, Firestore indexes and TTL policies. Runs before hosting so a new
+  # client never goes live against rules that don't know about it. Service account roles needed:
+  # Firebase Rules Admin, Cloud Datastore Index Admin, Firebase Storage Admin.
+  deploy_rules:
     needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BINGO_5717E }}
+      - run: pnpm exec firebase deploy --only firestore,storage --project bingo-5717e --non-interactive --force
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+  build_and_deploy:
+    needs: deploy_rules
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,10 +59,9 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BINGO_5717E }}
           channelId: live
           projectId: bingo-5717e
-  # Backend (Functions, Firestore/Storage rules, indexes and TTL policies). Opt in by setting the
-  # repository variable DEPLOY_BACKEND=true once the service account has the roles needed
-  # (Cloud Functions Admin, Service Account User, Firebase Rules Admin, Cloud Datastore Index Admin).
-  deploy_backend:
+  # Cloud Functions. Opt in by setting the repository variable DEPLOY_BACKEND=true once the
+  # service account has the roles needed (Cloud Functions Admin, Service Account User).
+  deploy_functions:
     needs: test
     if: ${{ vars.DEPLOY_BACKEND == 'true' }}
     runs-on: ubuntu-latest
@@ -54,7 +73,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BINGO_5717E }}' > "$RUNNER_TEMP/sa.json"
-      - run: pnpm exec firebase deploy --only functions,firestore,storage --project bingo-5717e --non-interactive --force
+      - run: printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BINGO_5717E }}
+      - run: pnpm exec firebase deploy --only functions --project bingo-5717e --non-interactive --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
