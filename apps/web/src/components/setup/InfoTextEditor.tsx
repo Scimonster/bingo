@@ -165,6 +165,8 @@ function Toolbar({ editor, uid, onUploadError }: { editor: Editor; uid: string; 
     },
   });
   const chain = () => editor.chain().focus();
+  /** After a dropdown change, give the caret back to the editor so typing continues there. */
+  const refocus = () => setTimeout(() => editor.view.focus(), 0);
   const insertImage = async (file: File) => {
     setUploading(true);
     onUploadError(null);
@@ -187,6 +189,7 @@ function Toolbar({ editor, uid, onUploadError }: { editor: Editor; uid: string; 
           const v = e.target.value;
           if (v === "p") chain().setParagraph().run();
           else chain().setHeading({ level: v === "h1" ? 1 : 2 }).run();
+          refocus();
         }}
       >
         <option value="p">Normal text</option>
@@ -201,6 +204,7 @@ function Toolbar({ editor, uid, onUploadError }: { editor: Editor; uid: string; 
           const v = e.target.value as InfoSize | "";
           if (v) chain().setFontSize(sizeCss(v)).run();
           else chain().unsetFontSize().run();
+          refocus();
         }}
       >
         {SIZE_OPTIONS.map((o) => (
