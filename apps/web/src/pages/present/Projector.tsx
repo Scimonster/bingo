@@ -14,6 +14,7 @@ import { JoinQR, joinUrl } from "../../components/live/JoinQR";
 import { SpinReveal } from "../../components/live/SpinReveal";
 import { DrawnItemsGrid } from "../../components/live/DrawnItemsGrid";
 import { WinBoard } from "../../components/live/WinBoard";
+import { GeltRain } from "../../components/live/GeltRain";
 import { patternLabel } from "../../components/live/patterns";
 import { autoDrawBlocker, secondsUntil } from "../../components/live/liveUtils";
 import { useFullscreen, useWakeLock } from "../../components/live/screen";
@@ -316,6 +317,7 @@ function WinOverlay({ gameId, session: s, grid, resolve, slotLabel }: { gameId: 
           <div className="aspect-square h-[min(80vh,45vw)] rounded-2xl bg-white p-[1vh] text-slate-950">
             <WinBoard gameId={gameId} serial={current.serial} slot={s.sheetSlot} grid={grid} drawnIds={drawnIds} patterns={s.patterns} patternIds={patternIds} resolve={resolve} label={fmt(t("sheetNo"), { serial: current.serial })} className="h-full w-full" />
           </div>
+          <GeltRain count={queue.length > 2 ? 30 : 60} />
         </motion.div>
       )}
     </AnimatePresence>

@@ -555,7 +555,7 @@ Drawn items grid.
 - 
 Join: code → name → "Getting your sheet…" or "Waiting for the host to add sheets".
 - 
-Play: the board for this round's slot on each held sheet, swipeable when there are several; latest-draw banner; winner toasts; a Bingo button per board (hidden in self mode); "Link my sheet" scanner in paper rounds.
+Play: the board for this round's slot on each held sheet, swipeable when there are several; latest-draw banner; winner toasts (and a small gelt shower when one of your sheets wins); a Bingo button per board (hidden in self mode); "Link my sheet" scanner in paper rounds.
 - 
 Ended: winners and a thank-you.
 **Projector**
@@ -571,7 +571,7 @@ Live |
 Spinner and current item, grid of all items with drawn ones lit, last 5 draws, draw count, auto-draw countdown |
 |
 Win |
-Overlay: player name, "Sheet № 042 · Game 2", winning pattern on the board |
+Overlay: player name, "Sheet № 042 · Game 2", winning pattern on the board, a short shower of falling gelt (none with reduced motion) |
 |
 Checking |
 The claimed board with drawn items marked and any winning pattern lit, player name (or the sheet number for an unlinked paper sheet), "Checking…" or "Not a bingo yet" |

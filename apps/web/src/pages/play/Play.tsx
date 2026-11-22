@@ -11,6 +11,7 @@ import { fmt, useT } from "../../lib/i18n";
 import { cn } from "../../components/ui";
 import { ItemTile, useGameContent } from "../../components/live/content";
 import { toggleMark, writeLastRound } from "../../components/live/liveUtils";
+import { GeltRain } from "../../components/live/GeltRain";
 import { patternLabel } from "../../components/live/patterns";
 import { BigSpinnerMessage, PlayerMessage, PlayerShell, playerError } from "./playerCommon";
 import { PlayerBoard } from "./PlayerBoard";
@@ -256,27 +257,39 @@ function WinnerToasts({ winners, mySheets }: { winners: Winner[]; mySheets: stri
   const t = useT();
   const seen = useRef(winners.length);
   const [toasts, setToasts] = useState<(Winner & { key: string })[]>([]);
+  // One of my sheets won: a small gelt shower (the projector has the big one).
+  const [celebrate, setCelebrate] = useState<string | null>(null);
   useEffect(() => {
     if (winners.length > seen.current) {
       const fresh = winners.slice(seen.current).map((w, i) => ({ ...w, key: `${w.claimId}-${seen.current + i}` }));
       setToasts((ts) => [...ts, ...fresh]);
       for (const f of fresh) setTimeout(() => setToasts((ts) => ts.filter((x) => x.key !== f.key)), 6000);
+      const mine = fresh.find((f) => mySheets.includes(f.serial));
+      if (mine) setCelebrate(mine.key);
     }
     seen.current = winners.length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only new winners matter
   }, [winners]);
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex flex-col items-center gap-2 px-4">
-      <AnimatePresence>
-        {toasts.map((w) => {
-          const mine = mySheets.includes(w.serial);
-          return (
-            <motion.div key={w.key} initial={{ y: -40, opacity: 0, scale: 0.9 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ opacity: 0, y: -20 }} className={cn("w-full max-w-md rounded-2xl px-4 py-3 text-center text-lg font-bold shadow-xl", mine ? "bg-emerald-500 text-white" : "bg-amber-300 text-amber-950")} role="status">
-              🎉 {mine ? t("youWon") : null} <span dir="auto">{fmt(t("winnerToast"), { name: w.name, pattern: patternLabel(t, { id: w.patternId, name: w.pattern }) })}</span>
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
-    </div>
+    <>
+      {celebrate && (
+        <div className="pointer-events-none fixed inset-0 z-30">
+          <GeltRain key={celebrate} count={18} coinSize="min(13vw, 64px)" />
+        </div>
+      )}
+      <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex flex-col items-center gap-2 px-4">
+        <AnimatePresence>
+          {toasts.map((w) => {
+            const mine = mySheets.includes(w.serial);
+            return (
+              <motion.div key={w.key} initial={{ y: -40, opacity: 0, scale: 0.9 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ opacity: 0, y: -20 }} className={cn("w-full max-w-md rounded-2xl px-4 py-3 text-center text-lg font-bold shadow-xl", mine ? "bg-emerald-500 text-white" : "bg-amber-300 text-amber-950")} role="status">
+                🎉 {mine ? t("youWon") : null} <span dir="auto">{fmt(t("winnerToast"), { name: w.name, pattern: patternLabel(t, { id: w.patternId, name: w.pattern }) })}</span>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+    </>
   );
 }
 
