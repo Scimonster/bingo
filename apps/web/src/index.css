@@ -15,3 +15,39 @@ body,
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
+
+/* Gelt shower (components/live/GeltRain.tsx): coins fall the height of the viewport while flipping. */
+@keyframes gelt-fall {
+  from {
+    transform: translate(0, -15vh) rotate(0deg);
+  }
+  to {
+    transform: translate(var(--gelt-drift, 0), 110vh) rotate(var(--gelt-tilt, 0deg));
+  }
+}
+@keyframes gelt-flip {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0.12);
+  }
+}
+.gelt-fall {
+  transform: translateY(-15vh);
+  animation-name: gelt-fall;
+  animation-timing-function: cubic-bezier(0.45, 0, 0.8, 0.6);
+  animation-fill-mode: both;
+  will-change: transform;
+}
+.gelt-flip {
+  animation-name: gelt-flip;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gelt-rain {
+    display: none;
+  }
+}

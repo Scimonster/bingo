@@ -124,6 +124,9 @@ describe("sessions: write", () => {
     await assertSucceeds(updateDoc(ownerSession(), { boardsPerPlayer: 10 }));
     await assertSucceeds(updateDoc(ownerSession(), { autoMark: true }));
     await assertSucceeds(updateDoc(ownerSession(), { onWin: "end" }));
+    await assertSucceeds(updateDoc(ownerSession(), { screenClaim: { claimId: "c1", serial: "004" } }));
+    await assertSucceeds(updateDoc(ownerSession(), { screenClaim: null }));
+    await assertSucceeds(updateDoc(ownerSession(), { autoShowClaims: false }));
   });
 
   it("rejects out-of-range values", async () => {
@@ -145,6 +148,11 @@ describe("sessions: write", () => {
     await assertFails(updateDoc(ownerSession(), { boardsPerPlayer: 11 }));
     await assertFails(updateDoc(ownerSession(), { autoMark: 1 }));
     await assertFails(updateDoc(ownerSession(), { onWin: "explode" }));
+    await assertFails(updateDoc(ownerSession(), { screenClaim: "c1" }));
+    await assertFails(updateDoc(ownerSession(), { screenClaim: { claimId: "c1" } }));
+    await assertFails(updateDoc(ownerSession(), { screenClaim: { claimId: "c1", serial: "004", extra: 1 } }));
+    await assertFails(updateDoc(ownerSession(), { screenClaim: { claimId: "", serial: "004" } }));
+    await assertFails(updateDoc(ownerSession(), { autoShowClaims: "yes" }));
   });
 
   it("rejects Function-only fields", async () => {
@@ -168,6 +176,7 @@ describe("sessions: write", () => {
 
   it("non-owners cannot update the session", async () => {
     await assertFails(updateDoc(doc(db(anon(env, PLAYER)), S), { status: "live" }));
+    await assertFails(updateDoc(doc(db(anon(env, DISPLAY)), S), { screenClaim: null }));
     await assertFails(updateDoc(doc(db(anon(env, DISPLAY)), S), { status: "live" }));
     await assertFails(updateDoc(doc(db(host(env, OTHER_HOST)), S), { status: "live" }));
   });

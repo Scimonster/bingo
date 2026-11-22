@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { SheetStyles, type Resolve } from "@bingo/sheet";
-import { FREE, type Board, type Game, type Player, type Session, type Winner } from "@bingo/core";
+import { FREE, type Board, type Claim, type Game, type Player, type Session, type Winner } from "@bingo/core";
 import { db } from "../../lib/firebase";
 import { useAuth, useCollection, useDoc, useNow } from "../../lib/hooks";
 import { PlayerLanguage, fmt, useT } from "../../lib/i18n";
@@ -14,6 +14,7 @@ import { JoinQR, joinUrl } from "../../components/live/JoinQR";
 import { SpinReveal } from "../../components/live/SpinReveal";
 import { DrawnItemsGrid } from "../../components/live/DrawnItemsGrid";
 import { WinBoard } from "../../components/live/WinBoard";
+import { GeltRain } from "../../components/live/GeltRain";
 import { patternLabel } from "../../components/live/patterns";
 import { autoDrawBlocker, secondsUntil } from "../../components/live/liveUtils";
 import { useFullscreen, useWakeLock } from "../../components/live/screen";
@@ -55,7 +56,7 @@ export default function Projector() {
   let body: React.ReactNode;
   if (authLoading || session.loading || content.loading) body = <Center><span className="inline-block size-16 animate-spin rounded-full border-4 border-yellow-300 border-t-transparent" /></Center>;
   else if (!user || !session.data || !game) body = <NoAccess />;
-  else body = <Stage gameId={gameId} session={session.data} game={game} resolve={content.resolve} items={content.items.data as ItemDoc[]} playerCount={players.data.length} playerNames={players.data.map((p) => p.name)} />;
+  else body = <Stage gameId={gameId} sessionId={sessionId} session={session.data} game={game} resolve={content.resolve} items={content.items.data as ItemDoc[]} playerCount={players.data.length} playerNames={players.data.map((p) => p.name)} />;
 
   return (
     <PlayerLanguage lang={lang}>
@@ -91,6 +92,7 @@ function FullscreenButton() {
 
 interface StageProps {
   gameId: string;
+  sessionId: string;
   session: Session;
   game: Game & { id: string };
   resolve: Resolve;
@@ -112,6 +114,9 @@ function Stage(p: StageProps) {
       <div className="absolute end-3 top-3 z-20 opacity-40 transition-opacity hover:opacity-100">
         <FullscreenButton />
       </div>
+      {s.status !== "ended" && s.mode === "central" && (
+        <ClaimScreen gameId={p.gameId} sessionId={p.sessionId} session={s} grid={{ rows: p.game.settings.rows, cols: p.game.settings.cols }} resolve={p.resolve} slotLabel={slotLabel} />
+      )}
       <WinOverlay gameId={p.gameId} session={s} grid={{ rows: p.game.settings.rows, cols: p.game.settings.cols }} resolve={p.resolve} slotLabel={slotLabel} />
     </>
   );
@@ -301,8 +306,8 @@ function WinOverlay({ gameId, session: s, grid, resolve, slotLabel }: { gameId: 
         >
           <motion.div initial={{ scale: 0.5, rotate: -6 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 200, damping: 12 }} className="flex max-w-[45vw] flex-col items-center gap-[2vh] text-center">
             <div className="text-[min(9vw,15vh)] leading-none font-black text-yellow-300">{t("bingo")}</div>
-            <div className="text-[min(5vw,9vh)] leading-tight font-black break-words" dir="auto">{current.name}</div>
-            <div className="text-[min(2.6vw,4.4vh)] text-white/80">
+            {current.name && <div className="text-[min(5vw,9vh)] leading-tight font-black break-words" dir="auto">{current.name}</div>}
+            <div className={cn("text-white/80", current.name ? "text-[min(2.6vw,4.4vh)]" : "text-[min(4vw,7vh)] font-bold text-white")}>
               <bdi>{fmt(t("sheetNo"), { serial: current.serial })}</bdi> · <bdi>{slotLabel}</bdi>
             </div>
             <div className="rounded-full bg-yellow-300 px-[2vw] py-[0.6vh] text-[min(2.4vw,4vh)] font-bold text-slate-950" dir="auto">
@@ -311,6 +316,68 @@ function WinOverlay({ gameId, session: s, grid, resolve, slotLabel }: { gameId: 
           </motion.div>
           <div className="aspect-square h-[min(80vh,45vw)] rounded-2xl bg-white p-[1vh] text-slate-950">
             <WinBoard gameId={gameId} serial={current.serial} slot={s.sheetSlot} grid={grid} drawnIds={drawnIds} patterns={s.patterns} patternIds={patternIds} resolve={resolve} label={fmt(t("sheetNo"), { serial: current.serial })} className="h-full w-full" />
+          </div>
+          <GeltRain count={queue.length > 2 ? 30 : 60} />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/** How long a claim the host rejected stays up after it leaves the screen (ms). */
+const REJECTED_LINGER_MS = 4000;
+/** Grace for the claim's own decision to arrive after the session moved the screen on (ms). */
+const DECISION_GRACE_MS = 1500;
+
+/**
+ * The claim being checked (`session.screenClaim`): the claimed sheet's board with drawn items
+ * marked and any winning pattern highlighted, so the room can follow the host's check. A claim
+ * that turns out valid gives way to the win overlay; one the host rejects stays up briefly.
+ */
+function ClaimScreen({ gameId, sessionId, session: s, grid, resolve, slotLabel }: { gameId: string; sessionId: string; session: Session; grid: { rows: number; cols: number }; resolve: Resolve; slotLabel: string }) {
+  const t = useT();
+  const target = s.screenClaim?.claimId ?? null;
+  const [heldId, setHeldId] = useState(target);
+  const claim = useDoc<Claim>(heldId ? `games/${gameId}/sessions/${sessionId}/claims/${heldId}` : null);
+  const status = claim.data?.status;
+  // Rejected while it was the one on screen (a host's paper check result): may leave at once.
+  const wasInvalidOnScreen = useRef(false);
+  if (heldId === target) wasInvalidOnScreen.current = status === "invalid";
+  useEffect(() => {
+    if (target === heldId) return;
+    if (!heldId || status === "valid" || wasInvalidOnScreen.current) return setHeldId(target);
+    const tm = setTimeout(() => setHeldId(target), status === "invalid" ? REJECTED_LINGER_MS : DECISION_GRACE_MS);
+    return () => clearTimeout(tm);
+  }, [target, heldId, status]);
+  const drawnIds = useMemo(() => s.draws.map((d) => d.itemId), [s.draws]);
+  const c = claim.data;
+  const visible = !!c && c.status !== "valid";
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          key={c.id}
+          className="absolute inset-0 z-[25] flex items-center justify-center gap-[4vw] bg-slate-950/95 p-[3vw]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          data-testid="claim-screen"
+        >
+          <div className="flex max-w-[40vw] flex-col items-center gap-[2vh] text-center">
+            <div className="text-[min(2.6vw,4.4vh)] font-semibold text-white/70">{t("claimBeingChecked")}</div>
+            {c.playerName && <div className="text-[min(5vw,9vh)] leading-tight font-black break-words" dir="auto">{c.playerName}</div>}
+            <div className={cn(c.playerName ? "text-[min(2.6vw,4.4vh)] text-white/80" : "text-[min(4.4vw,8vh)] font-black")}>
+              <bdi>{fmt(t("sheetNo"), { serial: c.serial })}</bdi> · <bdi>{slotLabel}</bdi>
+            </div>
+            {c.status === "pending" ? (
+              <div className="animate-pulse rounded-full bg-white/15 px-[2vw] py-[0.6vh] text-[min(2.4vw,4vh)] font-bold text-yellow-300">{t("checking")}</div>
+            ) : (
+              <div className="rounded-full bg-rose-500 px-[2vw] py-[0.6vh] text-[min(2.4vw,4vh)] font-bold text-white">{t("claimInvalid")}</div>
+            )}
+          </div>
+          <div className="aspect-square h-[min(80vh,48vw)] rounded-2xl bg-white p-[1vh] text-slate-950">
+            <WinBoard gameId={gameId} serial={c.serial} slot={s.sheetSlot} grid={grid} drawnIds={drawnIds} patterns={s.patterns} patternIds={c.matchedPatternIds} resolve={resolve} label={fmt(t("sheetNo"), { serial: c.serial })} className="h-full w-full" />
           </div>
         </motion.div>
       )}

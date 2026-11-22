@@ -38,9 +38,16 @@ Function-written: everything at creation (`status: "lobby"`), `draws`, `assignme
 `summary`, `joinCode`, `createdAt`, `endedAt`, `lastActivityAt`, `totalItems` (bag size),
 `waitingCount` (players waiting for sheets), `pendingClaims` (claims awaiting host), `autoDraw.nextDrawAt`.
 
+`screenClaim` `{ claimId, serial } | null` is the claim whose board the projector shows while it is
+checked. `submitClaim` sets it for a new pending claim when nothing is on screen, and for a host's
+paper check that found no bingo; `decideClaim` moves it to the next pending claim (oldest first) or
+clears it when the claim on screen is decided; `draw` clears it once no claim is pending. All of this
+only while `autoShowClaims` is not `false`. The owner may also set or clear it directly (show/hide).
+
 Owner client may update only: `status` (lobby→live, live→paused, paused→live; never to/from
 "ended" — use `endRound`), `autoDraw.enabled`, `autoDraw.intervalSec` (5–300), `patterns` (1–10),
-`verification`, `boardsPerPlayer` (1–10), `autoMark`, `onWin`. Nothing once `status == "ended"`.
+`verification`, `boardsPerPlayer` (1–10), `autoMark`, `onWin`, `screenClaim` (null or
+`{ claimId, serial }`), `autoShowClaims` (bool). Nothing once `status == "ended"`.
 (The console normally uses the `setAutoDraw` action, which also sets `nextDrawAt`.)
 
 Serials inside a round (`assignments` keys, `players.sheets`, `players.marks` keys, `claims.serial`,

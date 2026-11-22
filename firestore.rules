@@ -293,16 +293,25 @@ service cloud.firestore {
             && isInt(a.intervalSec, 5, 300);
         }
 
+        // Claim on the projector: null, or { claimId, serial } (the host shows/hides a claim's board).
+        function validScreenClaim(c) {
+          return c == null
+            || (c is map && c.keys().hasOnly(['claimId', 'serial']) && c.keys().hasAll(['claimId', 'serial'])
+              && isStr(c.claimId, 1, 64) && isStr(c.serial, 1, 8));
+        }
+
         allow update: if isOwner(gameId)
           && resource.data.status != 'ended'
-          && changed().hasOnly(['status', 'autoDraw', 'patterns', 'verification', 'boardsPerPlayer', 'autoMark', 'onWin'])
+          && changed().hasOnly(['status', 'autoDraw', 'patterns', 'verification', 'boardsPerPlayer', 'autoMark', 'onWin', 'screenClaim', 'autoShowClaims'])
           && legalStatusChange(resource.data.status, request.resource.data.status)
           && (!('autoDraw' in changed()) || validAutoDrawUpdate())
           && (!('patterns' in changed()) || validRoundPatterns(request.resource.data.patterns))
           && (!('verification' in changed()) || request.resource.data.verification in ['auto', 'host'])
           && (!('boardsPerPlayer' in changed()) || isInt(request.resource.data.boardsPerPlayer, 1, 10))
           && (!('autoMark' in changed()) || request.resource.data.autoMark is bool)
-          && (!('onWin' in changed()) || request.resource.data.onWin in ['continue', 'end']);
+          && (!('onWin' in changed()) || request.resource.data.onWin in ['continue', 'end'])
+          && (!('screenClaim' in changed()) || validScreenClaim(request.resource.data.screenClaim))
+          && (!('autoShowClaims' in changed()) || request.resource.data.autoShowClaims is bool);
 
         // drawState and display token: never client-accessible.
         match /private/{docId} {

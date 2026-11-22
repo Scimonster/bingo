@@ -90,6 +90,11 @@ export async function submitClaim(ctx: Ctx, req: Req<"submitClaim">): Promise<Re
     const update: Record<string, unknown> = { lastActivityAt: now };
     if (status === "valid") update.winners = [...session.winners, ...winnersFor(claim, cRef.id, session, now)];
     if (status === "pending") update.pendingClaims = (session.pendingClaims ?? 0) + 1;
+    // The projector shows the board while a claim is checked: a new pending claim when nothing else
+    // is on screen, and the result of a host's paper check that found no bingo (wins get the overlay).
+    if (session.autoShowClaims !== false && ((status === "pending" && !session.screenClaim) || (isOwner && status === "invalid"))) {
+      update.screenClaim = { claimId: cRef.id, serial };
+    }
     tx.update(sRef, update);
     return { claimId: cRef.id, status, matchedPattern: claim.matchedPattern, end: status === "valid" && session.onWin === "end" };
   });
@@ -109,12 +114,21 @@ export async function decideClaim(ctx: Ctx, req: Req<"decideClaim">): Promise<Re
     const claim = cSnap!.data() as Claim;
     if (claim.status !== "pending") return { status: claim.status as "valid" | "invalid", end: false };
     if (session.status === "ended") fail("failed-precondition", "round-ended", "This round has ended");
+    const onScreen = session.screenClaim?.claimId === req.claimId;
+    const others = onScreen && session.autoShowClaims !== false
+      ? (await tx.get(sRef.collection("claims").where("status", "==", "pending"))).docs.filter((d) => d.id !== req.claimId)
+      : [];
     const now = Date.now();
     const status = req.accept ? "valid" : "invalid";
     tx.update(cRef, { status, decidedAt: now });
     const pendingClaims = Math.max(0, (session.pendingClaims ?? 0) - 1);
     const update: Record<string, unknown> = { pendingClaims, lastActivityAt: now };
     if (status === "valid") update.winners = [...session.winners, ...winnersFor(claim, cRef.id, session, now)];
+    // The decided claim leaves the projector; the next waiting claim (oldest first) takes its place.
+    if (onScreen) {
+      const next = others.map((d) => ({ id: d.id, c: d.data() as Claim })).sort((a, b) => a.c.createdAt - b.c.createdAt)[0];
+      update.screenClaim = next ? { claimId: next.id, serial: next.c.serial } : null;
+    }
     // Auto-draw paused while the claim waited; restart its timer.
     if (pendingClaims === 0 && session.autoDraw.enabled) {
       update["autoDraw.nextDrawAt"] = now + session.autoDraw.intervalSec * 1000;
