@@ -118,6 +118,8 @@ export async function startRound(ctx: Ctx, req: Req<"startRound">): Promise<Res<
     totalItems: remaining.length,
     waitingCount: 0,
     pendingClaims: 0,
+    screenClaim: null,
+    autoShowClaims: true,
   };
   const batch = db().batch();
   batch.create(sRef, session);
@@ -236,6 +238,8 @@ export async function draw(ctx: Ctx, req: Req<"draw">): Promise<Res<"draw">> {
       "autoDraw.nextDrawAt": nextDrawAt,
       lastActivityAt: now,
       ...(session.startedAt ? {} : { startedAt: now }),
+      // A checked claim's board leaves the projector once play moves on and nothing awaits the host.
+      ...(session.screenClaim && !(session.pendingClaims ?? 0) ? { screenClaim: null } : {}),
     });
     return { drawn: true, itemId, count: count + 1 };
   });

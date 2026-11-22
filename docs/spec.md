@@ -219,6 +219,7 @@ games/{gameId}/sessions/{sessionId}
   draws ⚙️: [{ itemId, at }]
   assignments ⚙️: { [serial]: uid }
   winners ⚙️: [{ name, serial, pattern, at }]
+  screenClaim: { claimId, serial } | null     claim on the projector (⚙️ and host)   autoShowClaims
   summary ⚙️: { drawCount, playerCount, durationSec }   written at end
 
   private/drawState ⚙️   { remaining: [itemId...] }     never client-readable
@@ -317,6 +318,8 @@ Paper: assigns nothing. "Link my sheet" scans the sheet's QR and calls ⚙️ `l
 Auto verification: a valid claim is accepted immediately and added to `winners`.
 - 
 Host verification: the claim is `pending`, auto-draw pauses, and ⚙️ `decideClaim(claimId, accept)` resolves it.
+- 
+While a claim is checked the projector shows the claimed board (`screenClaim`): a new pending claim goes on screen when nothing else is, the next one follows when it is decided, and a host's paper check that is not a bingo stays up until the next draw. The host can show or hide any pending claim and turn the automatic showing off.
 - 
 Each sheet wins each pattern at most once per round. After a valid win, the round continues or ends per `onWin`.
 - 
@@ -455,7 +458,7 @@ none |
 |
 `sessions/{s}` |
 owner, members of that round |
-owner: status (lobby→live⇄paused), autoDraw enabled/interval, patterns, verification, cap, autoMark, onWin; nothing once ended |
+owner: status (lobby→live⇄paused), autoDraw enabled/interval, patterns, verification, cap, autoMark, onWin, screenClaim, autoShowClaims; nothing once ended |
 |
 `private/*` |
 nobody |
@@ -542,7 +545,7 @@ Top bar: status, slot label, join code, player count, draws so far / total, open
 - 
 Draw panel: Draw button, auto-draw toggle with interval and countdown, current item.
 - 
-Claims queue: each pending claim shows the board with matched cells highlighted, Accept / Reject; a "Check a paper sheet" serial input.
+Claims queue: each pending claim shows the board with matched cells highlighted, Accept / Reject, Show on / Hide from projector; a "Check a paper sheet" serial input; a "Show claims on the projector" toggle.
 - 
 Players panel: names and serials, "waiting for sheets" alert with Generate more, rename, remove, move sheets.
 - 
@@ -569,6 +572,9 @@ Spinner and current item, grid of all items with drawn ones lit, last 5 draws, d
 |
 Win |
 Overlay: player name, "Sheet № 042 · Game 2", winning pattern on the board |
+|
+Checking |
+The claimed board with drawn items marked and any winning pattern lit, player name (or the sheet number for an unlinked paper sheet), "Checking…" or "Not a bingo yet" |
 |
 Ended |
 Winners and total draws |

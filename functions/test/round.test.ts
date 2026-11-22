@@ -162,6 +162,8 @@ describe("central paper round", () => {
     expect((await getSession(gameId, sessionId)).pendingClaims).toBe(1);
     const dup = await live(ann, { action: "submitClaim", gameId, sessionId, serial: "4" });
     expect(dup.claimId).toBe(c.claimId);
+    // The pending claim goes on the projector.
+    expect((await getSession(gameId, sessionId)).screenClaim).toEqual({ claimId: c.claimId, serial: "004" });
 
     // Auto draw refused while a claim is pending; manual draw still allowed.
     expect(await live(host, { action: "draw", gameId, sessionId, expectedCount: n, auto: true })).toEqual({ drawn: false, count: n });
@@ -170,6 +172,7 @@ describe("central paper round", () => {
     const s = await getSession(gameId, sessionId);
     expect(s.pendingClaims).toBe(0);
     expect(s.winners.map((w) => w.claimId)).toEqual([c.claimId]);
+    expect(s.screenClaim).toBeNull();
     expect(s.autoDraw.nextDrawAt).toBeGreaterThan(Date.now());
     // Deciding again is a no-op.
     expect(await live(host, { action: "decideClaim", gameId, sessionId, claimId: c.claimId, accept: false })).toEqual({ status: "valid" });
@@ -186,8 +189,37 @@ describe("central paper round", () => {
     await live(bob, { action: "linkSheet", gameId, sessionId, serial: "2" });
     const c2 = await live(bob, { action: "submitClaim", gameId, sessionId, serial: "2" });
     expect(c2.status).toBe("pending");
+    // A second claim waits its turn for the projector, then takes over when the first is decided.
+    const carl = anon();
+    await live(carl, { action: "joinRound", code: joinCode, name: "Carl" });
+    await live(carl, { action: "linkSheet", gameId, sessionId, serial: "3" });
+    const c3 = await live(carl, { action: "submitClaim", gameId, sessionId, serial: "3" });
+    expect((await getSession(gameId, sessionId)).screenClaim).toEqual({ claimId: c2.claimId, serial: "002" });
     expect(await live(host, { action: "decideClaim", gameId, sessionId, claimId: c2.claimId, accept: false })).toEqual({ status: "invalid" });
     expect((await getSession(gameId, sessionId)).winners).toHaveLength(1);
+    expect((await getSession(gameId, sessionId)).screenClaim).toEqual({ claimId: c3.claimId, serial: "003" });
+    // Deciding a claim that is not on screen leaves the screen alone.
+    await sessionDoc(gameId, sessionId).update({ screenClaim: null });
+    await live(host, { action: "decideClaim", gameId, sessionId, claimId: c3.claimId, accept: false });
+    expect((await getSession(gameId, sessionId)).screenClaim).toBeNull();
+
+    // A host's paper check with no bingo shows the board; the next draw clears it.
+    const before = (await getSession(gameId, sessionId)).draws.length;
+    const paper = await live(host, { action: "submitClaim", gameId, sessionId, serial: "5" });
+    if (paper.status === "invalid") {
+      expect((await getSession(gameId, sessionId)).screenClaim).toEqual({ claimId: paper.claimId, serial: "005" });
+      await live(host, { action: "draw", gameId, sessionId, expectedCount: before });
+      expect((await getSession(gameId, sessionId)).screenClaim).toBeNull();
+    } else {
+      // A winning paper check gets the win overlay instead.
+      expect((await getSession(gameId, sessionId)).screenClaim).toBeNull();
+    }
+
+    // With auto-show off, new claims stay off the projector.
+    await sessionDoc(gameId, sessionId).update({ autoShowClaims: false });
+    const c4 = await live(bob, { action: "submitClaim", gameId, sessionId, serial: "2" });
+    expect(c4.status).toBe("pending");
+    expect((await getSession(gameId, sessionId)).screenClaim).toBeNull();
   });
 
   it("onWin end: a valid win ends the round", async () => {

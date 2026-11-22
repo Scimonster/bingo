@@ -139,6 +139,16 @@ export interface Session {
   totalItems?: number;
   waitingCount?: number;
   pendingClaims?: number;
+  /** The claim whose board the projector shows while it is checked (null: none). */
+  screenClaim?: ScreenClaim | null;
+  /** Put new claims on the projector automatically (missing = true). */
+  autoShowClaims?: boolean;
+}
+
+/** A claim shown on the projector: a pending claim, or the result of a host's paper check. */
+export interface ScreenClaim {
+  claimId: string;
+  serial: string;
 }
 
 export interface Player {

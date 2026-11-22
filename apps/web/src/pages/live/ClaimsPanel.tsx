@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
+import { doc, updateDoc } from "firebase/firestore";
 import type { Resolve } from "@bingo/sheet";
-import type { Grid, LiveRoundResponses } from "@bingo/core";
+import type { Grid, LiveRoundResponses, ScreenClaim } from "@bingo/core";
+import { db } from "../../lib/firebase";
 import { liveRound } from "../../lib/callables";
 import { Alert, Badge, Button, Card, Input, cn } from "../../components/ui";
 import { WinBoard } from "../../components/live/WinBoard";
@@ -32,6 +34,13 @@ export function ClaimsPanel({
       return r;
     });
   const sortedPending = [...pending].sort((a, b) => a.createdAt - b.createdAt);
+  const sessionPath = `games/${gameId}/sessions/${sessionId}`;
+  const onScreen = s.screenClaim ?? null;
+  const setScreen = (screenClaim: ScreenClaim | null) => run("screen", () => updateDoc(doc(db, sessionPath), { screenClaim }));
+  const setAutoShow = (autoShowClaims: boolean) => run("screen", () => updateDoc(doc(db, sessionPath), { autoShowClaims }));
+  const screenBusy = busy === "screen" || s.status === "ended";
+  // A claim on screen that is no longer pending: the result of a paper check.
+  const shownResult = onScreen && !pending.some((c) => c.id === onScreen.claimId) ? onScreen : null;
 
   return (
     <Card className="space-y-4">
@@ -40,6 +49,17 @@ export function ClaimsPanel({
         {pending.length > 0 && <Badge className="bg-amber-100 text-amber-900">{pending.length} pending</Badge>}
         <Badge className="ms-auto">{s.verification === "host" ? "You confirm claims" : "Auto-verified"}</Badge>
       </div>
+
+      <label className="flex items-center justify-between gap-2 text-sm">
+        Show claims on the projector while you check them
+        <input type="checkbox" className="size-5 accent-indigo-600" checked={s.autoShowClaims !== false} disabled={screenBusy} onChange={(e) => setAutoShow(e.target.checked)} />
+      </label>
+      {shownResult && (
+        <div className="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
+          <span>📺 The projector shows sheet <span className="font-mono">№ {shownResult.serial}</span></span>
+          <Button variant="secondary" size="sm" className="ms-auto" onClick={() => setScreen(null)} disabled={screenBusy}>Hide</Button>
+        </div>
+      )}
 
       {sortedPending.map((c) => (
         <div key={c.id} className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3">
@@ -63,6 +83,16 @@ export function ClaimsPanel({
             label={`Sheet ${c.serial}`}
             className="mx-auto max-w-sm"
           />
+          <div className="mt-3 flex items-center gap-2 text-sm">
+            {onScreen?.claimId === c.id ? (
+              <>
+                <span className="font-semibold text-indigo-700">📺 On the projector</span>
+                <Button variant="secondary" size="sm" className="ms-auto" onClick={() => setScreen(null)} disabled={screenBusy}>Hide from projector</Button>
+              </>
+            ) : (
+              <Button variant="secondary" size="sm" className="ms-auto" onClick={() => setScreen({ claimId: c.id, serial: c.serial })} disabled={screenBusy}>Show on projector</Button>
+            )}
+          </div>
           <div className="mt-3 flex gap-2">
             <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={() => decide(c.id, true)} disabled={busy === `decide:${c.id}`}>Accept</Button>
             <Button className="flex-1" variant="destructive" onClick={() => decide(c.id, false)} disabled={busy === `decide:${c.id}`}>Reject</Button>
