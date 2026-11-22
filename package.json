@@ -13,6 +13,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r --filter=!functions --filter=!@bingo/rules-tests test",
     "test:emulators": "pnpm build:functions && firebase emulators:exec --project demo-bingo --only auth,firestore,storage \"pnpm --filter @bingo/rules-tests test && pnpm --filter functions test\"",
+    "admin:set": "node functions/scripts/set-admin.mjs",
     "test:all": "pnpm typecheck && pnpm test && pnpm test:emulators"
   },
   "devDependencies": {

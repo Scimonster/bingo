@@ -7,6 +7,8 @@ import { fail } from "./errors";
 export interface Ctx {
   uid: string | null;
   isAnonymous: boolean;
+  /** Site admin: custom claim `admin: true` on a non-anonymous account. Admins pass owner checks. */
+  isAdmin?: boolean;
 }
 
 export function requireAuth(ctx: Ctx): string {
@@ -29,12 +31,23 @@ export async function loadGame(gameId: string): Promise<{ ref: DocumentReference
   return { ref, game: snap.data() as Game };
 }
 
-/** Loads the game and checks the caller is its (non-anonymous) owner. */
+export function requireAdmin(ctx: Ctx): string {
+  const uid = requireAuth(ctx);
+  if (ctx.isAnonymous || !ctx.isAdmin) fail("permission-denied", "not-admin", "Only site admins can do this");
+  return uid;
+}
+
+/** True if the caller owns the game or is a site admin (never for anonymous users). */
+export function canManage(ctx: Ctx, game: Game): boolean {
+  return !!ctx.uid && !ctx.isAnonymous && (game.ownerId === ctx.uid || !!ctx.isAdmin);
+}
+
+/** Loads the game and checks the caller is its (non-anonymous) owner or a site admin. */
 export async function requireOwner(ctx: Ctx, gameId: string): Promise<{ ref: DocumentReference; game: Game; uid: string }> {
   const uid = requireAuth(ctx);
   if (ctx.isAnonymous) fail("permission-denied", "not-owner", "Hosts must be signed in with an account");
   const { ref, game } = await loadGame(gameId);
-  if (game.ownerId !== uid) fail("permission-denied", "not-owner", "Only the game owner can do this");
+  if (!canManage(ctx, game)) fail("permission-denied", "not-owner", "Only the game owner can do this");
   return { ref, game, uid };
 }
 

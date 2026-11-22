@@ -34,6 +34,13 @@ export async function newHost(): Promise<Ctx> {
   return { uid: user.uid, isAnonymous: false };
 }
 
+/** A host account with the site-admin custom claim. */
+export async function newAdmin(): Promise<Ctx> {
+  const user = await getAuth().createUser({ email: `admin-${randomUUID()}@example.com`, password: "test-password" });
+  await getAuth().setCustomUserClaims(user.uid, { admin: true });
+  return { uid: user.uid, isAnonymous: false, isAdmin: true };
+}
+
 export function anon(label = "p"): Ctx {
   return { uid: `${label}-${randomUUID()}`, isAnonymous: true };
 }

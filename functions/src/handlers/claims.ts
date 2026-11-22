@@ -8,7 +8,7 @@ import {
   type Sheet,
   type Winner,
 } from "@bingo/core";
-import { gameRef, requireAuth, requireOwner, loadGame, sessionData, sessionRef, type Ctx } from "../context";
+import { canManage, gameRef, requireAuth, requireOwner, loadGame, sessionData, sessionRef, type Ctx } from "../context";
 import { fail } from "../errors";
 import { sessionTx } from "../util";
 import { endRoundInternal } from "./round";
@@ -32,7 +32,7 @@ function winnersFor(claim: Claim, claimId: string, session: Session, now: number
 export async function submitClaim(ctx: Ctx, req: Req<"submitClaim">): Promise<Res<"submitClaim">> {
   const uid = requireAuth(ctx);
   const { game } = await loadGame(req.gameId);
-  const isOwner = !ctx.isAnonymous && game.ownerId === uid;
+  const isOwner = canManage(ctx, game);
   const n = Number(req.serial);
   if (!Number.isInteger(n) || n < 1) fail("invalid-argument", "bad-serial", "Invalid serial");
   const serial = formatSerial(n);

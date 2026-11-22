@@ -4,7 +4,7 @@ import type { User } from "firebase/auth";
 import type { Game, Item } from "@bingo/core";
 import { Alert, Badge, FullPageSpinner, Tabs } from "../../components/ui";
 import { HostHeader, LockIcon, RequireHost } from "../../components/setup/common";
-import { useCollection, useDoc } from "../../lib/hooks";
+import { useCollection, useDoc, useIsAdmin } from "../../lib/hooks";
 import { ContentTab } from "./ContentTab";
 import { SheetsTab } from "./SheetsTab";
 import { RoundsTab } from "./RoundsTab";
@@ -31,9 +31,12 @@ function GameHubInner({ user }: { user: User }) {
   const game = useDoc<Game>(gameId ? `games/${gameId}` : null);
   const items = useCollection<Omit<Item, "id">>(gameId ? `games/${gameId}/items` : null, [orderBy("createdAt", "asc")], gameId);
 
-  if (game.loading) return <FullPageSpinner />;
+  const admin = useIsAdmin(user);
+
+  if (game.loading || admin.loading) return <FullPageSpinner />;
   const g = game.data;
-  if (!g || g.ownerId !== user.uid) {
+  const asAdmin = !!g && g.ownerId !== user.uid && admin.isAdmin;
+  if (!g || (g.ownerId !== user.uid && !asAdmin)) {
     return (
       <div className="min-h-screen">
         <HostHeader user={user} />
@@ -67,6 +70,14 @@ function GameHubInner({ user }: { user: User }) {
         </nav>
       </HostHeader>
       <main className="mx-auto max-w-6xl space-y-4 p-4">
+        {asAdmin && (
+          <Alert kind="warn">
+            This game belongs to another host. You can view and change everything here as a site admin.{" "}
+            <Link to="/admin" className="font-medium underline">
+              Back to the admin panel
+            </Link>
+          </Alert>
+        )}
         <Tabs
           tabs={TABS.map((t) => ({ id: t.id, label: t.label }))}
           value={tab}

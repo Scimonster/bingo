@@ -70,6 +70,104 @@ export const deleteRoundRequestSchema = z.object({ gameId: id, sessionId: id });
 export const redeemDisplayTokenRequestSchema = z.object({ token: z.string().min(10).max(400) });
 export interface RedeemDisplayTokenResponse { gameId: string; sessionId: string }
 
+// ---------------------------------------------------------------- admin
+
+/**
+ * Site admin panel: one callable, `admin`, dispatching on `action`. Admins are signed-in,
+ * non-anonymous users whose ID token carries the custom claim `admin: true` (set with
+ * `pnpm admin:set <email>`). Admins also pass every game-owner check (rules and callables), so
+ * moderation (end/delete a round, delete a game) reuses `liveRound`/`deleteRound`/`deleteGame`.
+ */
+export const adminRequestSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("overview") }),
+  z.object({ action: z.literal("storage") }),
+  z.object({ action: z.literal("runJob"), job: z.enum(["cleanupImages", "endStaleRounds"]) }),
+]);
+export type AdminRequest = z.infer<typeof adminRequestSchema>;
+export type AdminAction = AdminRequest["action"];
+
+export interface AdminStats {
+  hosts: number;
+  anonymousUsers: number;
+  games: number;
+  sheets: number;
+  rounds: number;
+  activeRounds: number;
+  /** Rounds created in the last 7 / 30 days. */
+  rounds7d: number;
+  rounds30d: number;
+  /** Players currently stored (rounds ended over 30 days ago are already cleaned up). */
+  playersStored: number;
+  /** Sum of `summary.playerCount` over ended rounds still on record. */
+  playersInEndedRounds: number;
+}
+
+export interface AdminHost {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  createdAt: number | null;
+  lastSignInAt: number | null;
+  disabled: boolean;
+  isAdmin: boolean;
+  gameCount: number;
+}
+
+export interface AdminRound {
+  sessionId: string;
+  status: "lobby" | "live" | "paused" | "ended";
+  medium: "paper" | "digital";
+  mode: "central" | "self";
+  createdAt: number | null;
+  lastActivityAt: number | null;
+  drawCount: number;
+  playerCount: number | null;
+}
+
+export interface AdminGame {
+  gameId: string;
+  title: string;
+  ownerId: string;
+  /** Owner's email, or null when the account no longer exists. */
+  ownerEmail: string | null;
+  createdAt: number | null;
+  contentLocked: boolean;
+  itemCount: number;
+  sheetCount: number;
+  rounds: AdminRound[];
+  /** Latest round activity, else the game's creation time. */
+  lastActivityAt: number | null;
+}
+
+export interface AdminStorageHost {
+  uid: string;
+  email: string | null;
+  imageFolders: number;
+  imageBytes: number;
+}
+
+export interface AdminStorageGame {
+  gameId: string;
+  title: string | null;
+  files: number;
+  bytes: number;
+}
+
+export interface AdminResponses {
+  overview: { stats: AdminStats; hosts: AdminHost[]; games: AdminGame[]; generatedAt: number };
+  storage: {
+    totalBytes: number;
+    imageBytes: number;
+    exportBytes: number;
+    otherBytes: number;
+    hosts: AdminStorageHost[];
+    exports: AdminStorageGame[];
+  };
+  runJob:
+    | { job: "cleanupImages"; deletedImageFolders: number; deletedExports: number }
+    | { job: "endStaleRounds"; endedRounds: number };
+}
+
 export const CALLABLE_NAMES = [
   "liveRound",
   "generateSheets",
@@ -79,5 +177,6 @@ export const CALLABLE_NAMES = [
   "deleteGame",
   "deleteRound",
   "redeemDisplayToken",
+  "admin",
 ] as const;
 export type CallableName = (typeof CALLABLE_NAMES)[number];

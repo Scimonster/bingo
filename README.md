@@ -40,6 +40,17 @@ pnpm dev
 
 Open http://localhost:5173. Host sign-in uses the Auth emulator's fake Google account picker.
 
+## Site admins
+
+Admins get the admin panel at `/admin` and owner rights on every game. Grant or revoke the custom
+claim (the user signs in once first so the account exists):
+
+```bash
+pnpm admin:set someone@example.com --emulator     # local Auth emulator
+pnpm admin:set someone@example.com                # production (Application Default Credentials)
+pnpm admin:set someone@example.com --revoke
+```
+
 ## Tests
 
 ```bash

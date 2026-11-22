@@ -43,6 +43,7 @@ export const PLAYER = "player1";
 export const PLAYER2 = "player2";
 export const DISPLAY = "display1";
 export const STRANGER = "stranger";
+export const ADMIN = "siteAdmin";
 
 export const GAME = "g1";
 export const SESSION = "s1";
@@ -50,6 +51,11 @@ export const OTHER_SESSION = "s0";
 
 export function host(env: RulesTestEnvironment, uid: string): RulesTestContext {
   return env.authenticatedContext(uid, { firebase: { sign_in_provider: "google.com" } });
+}
+
+/** A host with the site-admin custom claim (admin: true). */
+export function admin(env: RulesTestEnvironment, uid = ADMIN): RulesTestContext {
+  return env.authenticatedContext(uid, { firebase: { sign_in_provider: "google.com" }, admin: true });
 }
 
 export function anon(env: RulesTestEnvironment, uid: string): RulesTestContext {

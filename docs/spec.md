@@ -19,7 +19,7 @@ Automatic cleanup of finished rounds.
 **Out of scope for v1**
 
 - 
-Co-hosts or multiple host roles.
+Co-hosts or multiple host roles (a site admin role exists for running the service; see Site admin).
 - 
 Player accounts or cross-round player history.
 - 
@@ -66,7 +66,10 @@ Join code |
 Short code that lets a player join a live round. Valid only while the round is open. |
 |
 Host |
-The game owner. Signed-in, non-anonymous account. The only role with control. |
+The game owner. Signed-in, non-anonymous account. The only role with control over a game, apart from site admins. |
+|
+Admin |
+A site admin: a host account with the Auth custom claim `admin: true`. Has the admin panel and owner rights on every game. |
 |
 Player |
 An anonymous signed-in user who joined a round with a name. |
@@ -118,7 +121,7 @@ Finished rounds are cleaned up automatically; a summary is kept.
 - 
 Under 100 players per round.
 - 
-One host role (the game owner). No co-hosts.
+One host role (the game owner). No co-hosts. Site admins (custom claim) can manage every game.
 - 
 Hebrew with right-to-left layout on everything players see: player app, projector and printed sheets.
 ## Architecture and stack
@@ -414,6 +417,11 @@ callable |
 display |
 Exchanges a display link token for a display membership |
 |
+`admin` |
+callable |
+admin |
+Admin panel data: overview (stats, hosts, games, rounds), storage usage, run maintenance jobs now |
+|
 `autoEndStaleRounds` |
 scheduled, daily |
 — |
@@ -477,6 +485,7 @@ nobody |
 none |
 **Membership.** `joinRound` and `redeemDisplayToken` write `games/{g}/members/{uid}`. That doc lets an anonymous user read the game's content and only the rounds they joined. Winners are copied to `session.winners` so all members see them, while claims stay private.
 **Storage.** Hosts upload images (PNG, JPEG, WebP, GIF, up to 10 MB) only into their own folder. Any signed-in user may fetch an image by path; paths are random and only the owner can list them, so Firestore decides who learns a path. Clients can't delete images. Exported PDFs are readable by the game owner only.
+**Site admin.** A host account whose ID token carries the custom claim `admin: true` is a site admin. The claim is set outside the app with `pnpm admin:set <email>` (Admin SDK; `--revoke` removes it, `--emulator` targets the Auth emulator). Rules (`isAdmin()`) and callables (`Ctx.isAdmin`, from the verified token) treat an admin as the owner of every game: they may read, edit and run any host's game, round and exports, and may list all games. Nothing beyond owner rights: `private/*`, join codes and Function-only fields stay closed. An anonymous account never counts as an admin, even with the claim.
 **Other protections**
 
 - 
@@ -528,6 +537,10 @@ Player boards |
 `/s/:gameId/:serial` |
 player |
 Sheet QR landing: links the sheet in the player's active paper round, asking for the join code first if needed |
+|
+`/admin` |
+admin |
+Admin panel: Overview · Hosts · Games · Storage tabs |
 **Game hub tabs**
 
 - 
@@ -650,6 +663,19 @@ Background: an optional page colour and/or image (the print variant, cropped to 
 The preview can open a sheet at actual size (1 mm = 1 CSS mm) or fitted to the window.
 - 
 Rough cell sizes at 5×5: grid 2×2 on A4 about 17 mm, on A3 about 25 mm.
+## Site admin
+The admin panel (`/admin`) is for whoever runs the service. Everything it shows comes from the `admin` callable (Admin SDK, across all hosts); its actions reuse the ordinary owner callables, which admins pass.
+
+- 
+**Overview:** totals (hosts, games, sheets, rounds on record and in the last 7/30 days, active rounds, players, anonymous accounts) and the list of active rounds with a link to each console.
+- 
+**Hosts:** every non-anonymous account with email, sign-up and last sign-in, game count and admin flag; "Games" filters the games list to that host.
+- 
+**Games:** every game with owner, items, sheets, rounds and last activity; search, filter by host or by active rounds. Open (the normal game hub, with an "another host's game" banner), Delete game (typed confirmation), and per round: Console, End (open rounds) or Delete (ended rounds).
+- 
+**Storage:** bytes used by images per host and by PDF exports per game; buttons that run the image cleanup and stale-round jobs immediately.
+- 
+Admins can open any game hub, host console or projector and act as the owner. Images an admin uploads into another host's game go to the admin's own folder.
 ## Language and RTL
 Hebrew with right-to-left layout is required everywhere players look: the player app, the projector and printed sheets. The host UI ships in English first and is built i18n-ready.
 

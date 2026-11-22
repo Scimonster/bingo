@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { onAuthStateChanged, onIdTokenChanged, type User } from "firebase/auth";
 import { collection, doc, onSnapshot, query, type QueryConstraint } from "firebase/firestore";
 import { getDownloadURL, ref } from "firebase/storage";
 import { auth, db, storage } from "./firebase";
@@ -8,6 +8,46 @@ export function useAuth(): { user: User | null; loading: boolean } {
   const [state, setState] = useState<{ user: User | null; loading: boolean }>({ user: auth.currentUser, loading: !auth.currentUser });
   useEffect(() => onAuthStateChanged(auth, (user) => setState({ user, loading: false })), []);
   return state;
+}
+
+// Last known admin flag per uid, so pages don't flash a spinner on every mount.
+const adminCache = new Map<string, boolean>();
+
+/**
+ * Whether the signed-in user is a site admin (custom claim `admin: true`, never for anonymous
+ * users). `refresh` forces a new ID token, picking up a claim granted since sign-in.
+ */
+export function useIsAdmin(user: User | null | undefined, refresh = false): { isAdmin: boolean; loading: boolean } {
+  const uid = user && !user.isAnonymous ? user.uid : null;
+  const cached = uid ? adminCache.get(uid) : false;
+  const [state, setState] = useState<{ uid: string | null; isAdmin: boolean }>({
+    uid: cached === undefined ? null : uid,
+    isAdmin: cached ?? false,
+  });
+  useEffect(() => {
+    if (!uid) return;
+    let alive = true;
+    const check = (u: User | null) => {
+      if (!u || u.uid !== uid) return;
+      void u
+        .getIdTokenResult(refresh)
+        .then((r) => {
+          const isAdmin = r.claims.admin === true;
+          adminCache.set(uid, isAdmin);
+          if (alive) setState({ uid, isAdmin });
+        })
+        .catch(() => alive && setState({ uid, isAdmin: false }));
+    };
+    check(auth.currentUser);
+    const unsub = onIdTokenChanged(auth, check);
+    return () => {
+      alive = false;
+      unsub();
+    };
+  }, [uid, refresh]);
+  if (!uid) return { isAdmin: false, loading: false };
+  if (state.uid === uid) return { isAdmin: state.isAdmin, loading: false };
+  return { isAdmin: cached ?? false, loading: cached === undefined };
 }
 
 export interface Live<T> {

@@ -15,6 +15,7 @@
         ".git",
         "src",
         "test",
+        "scripts",
         "firebase-debug.log",
         "firebase-debug.*.log",
         "*.local"

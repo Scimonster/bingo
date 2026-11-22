@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, Navigate } from "react-router-dom";
 import type { User } from "firebase/auth";
 import { Alert, Button, Dialog, FullPageSpinner, Input, Label } from "../ui";
-import { useAuth } from "../../lib/hooks";
+import { useAuth, useIsAdmin } from "../../lib/hooks";
 import { isHost, signOut } from "../../lib/auth";
 import { errorMessage } from "../../lib/callables";
 
@@ -15,6 +15,7 @@ export function RequireHost({ children }: { children: (user: User) => ReactNode 
 }
 
 export function HostHeader({ user, children }: { user: User; children?: ReactNode }) {
+  const { isAdmin } = useIsAdmin(user);
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
@@ -22,6 +23,11 @@ export function HostHeader({ user, children }: { user: User; children?: ReactNod
           Bingo
         </Link>
         <div className="min-w-0 flex-1">{children}</div>
+        {isAdmin && (
+          <Link to="/admin" className="rounded-md px-2 py-1 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+            Admin
+          </Link>
+        )}
         <span className="hidden text-sm text-slate-500 sm:inline" title={user.email ?? undefined}>
           {user.displayName ?? user.email}
         </span>
