@@ -6,7 +6,7 @@ import { Alert, Badge, Button, Card, FullPageSpinner, Input, Select, Spinner, Ta
 import { ConfirmDialog, EmptyState, HostHeader, RequireHost } from "../../components/setup/common";
 import { useIsAdmin } from "../../lib/hooks";
 import { adminCall, deleteGame, deleteRound, errorMessage, liveRound } from "../../lib/callables";
-import { formatBytes, formatWhen } from "./format";
+import { formatBytes, formatWhen, plural } from "./format";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -165,7 +165,7 @@ function OverviewTab({ data, onOpenGames }: { data: Overview; onOpenGames: () =>
                 </Link>
                 <span className="text-sm text-slate-500">{game.ownerEmail ?? game.ownerId}</span>
                 <span className="ms-auto text-sm text-slate-500">
-                  {round.drawCount} draws · last activity {formatWhen(round.lastActivityAt)}
+                  {plural(round.drawCount, "draw")} · last activity {formatWhen(round.lastActivityAt)}
                 </span>
                 <Link to={`/games/${game.gameId}/rounds/${round.sessionId}`} className="text-sm font-medium text-indigo-700 hover:underline">
                   Console
@@ -316,8 +316,8 @@ function GameRow({ game: g, onAction }: { game: AdminGame; onAction: (p: Pending
           </div>
         </div>
         <p className="text-sm text-slate-600">
-          {g.ownerEmail ?? <span title={g.ownerId}>deleted account</span>} · {g.itemCount} items · {g.sheetCount} sheets ·{" "}
-          {g.rounds.length} rounds · created {formatWhen(g.createdAt)} · last activity {formatWhen(g.lastActivityAt)}
+          {g.ownerEmail ?? <span title={g.ownerId}>deleted account</span>} · {plural(g.itemCount, "item")} ·{" "}
+          {plural(g.sheetCount, "sheet")} · {plural(g.rounds.length, "round")} · created {formatWhen(g.createdAt)} · last activity {formatWhen(g.lastActivityAt)}
         </p>
         {g.rounds.length > 0 && (
           <details open={active > 0}>
@@ -327,7 +327,8 @@ function GameRow({ game: g, onAction }: { game: AdminGame; onAction: (p: Pending
                 <li key={r.sessionId} className="flex flex-wrap items-center gap-2 py-1.5">
                   <RoundStatus status={r.status} />
                   <span className="text-slate-600">
-                    {r.medium}, {r.mode} · {r.drawCount} draws{r.playerCount !== null ? ` · ${r.playerCount} players` : ""} · started{" "}
+                    {r.medium}, {r.mode} · {plural(r.drawCount, "draw")}
+                    {r.playerCount !== null ? ` · ${plural(r.playerCount, "player")}` : ""} · started{" "}
                     {formatWhen(r.createdAt)}
                   </span>
                   <span className="ms-auto flex gap-2">
@@ -366,8 +367,8 @@ function PendingDialog({ pending: p, onClose, onDone }: { pending: Pending; onCl
     return (
       <ConfirmDialog title="Delete game?" confirmLabel="Delete game" typeToConfirm={p.game.title} onConfirm={run} onClose={onClose}>
         <p>
-          This permanently deletes <strong dir="auto">{p.game.title}</strong> (owned by {owner}) with its content, {p.game.sheetCount} sheets and{" "}
-          {p.game.rounds.length} rounds. Printed sheets stop working. This cannot be undone.
+          This permanently deletes <strong dir="auto">{p.game.title}</strong> (owned by {owner}) with its content, {plural(p.game.sheetCount, "sheet")} and{" "}
+          {plural(p.game.rounds.length, "round")}. Printed sheets stop working. This cannot be undone.
         </p>
       </ConfirmDialog>
     );

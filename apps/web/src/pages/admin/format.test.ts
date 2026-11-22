@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatBytes, formatWhen } from "./format";
+import { formatBytes, formatWhen, plural } from "./format";
 
 describe("formatBytes", () => {
   it("picks a unit and keeps one decimal below 10", () => {
@@ -19,5 +19,12 @@ describe("formatWhen", () => {
     expect(formatWhen(now - 5 * 60_000, now)).toBe("5 min ago");
     expect(formatWhen(now - 3 * 3600_000, now)).toBe("3 h ago");
     expect(formatWhen(now - 2 * 86_400_000, now)).toBe("2 d ago");
+  });
+});
+
+describe("plural", () => {
+  it("adds an s except for one", () => {
+    expect(plural(1, "draw")).toBe("1 draw");
+    expect(plural(0, "draw")).toBe("0 draws");
   });
 });

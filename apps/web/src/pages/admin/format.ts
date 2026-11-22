@@ -23,3 +23,8 @@ export function formatWhen(ms: number | null | undefined, now = Date.now()): str
   if (d < 7 * 86_400_000) return `${Math.floor(d / 86_400_000)} d ago`;
   return new Date(ms).toLocaleDateString();
 }
+
+/** "1 draw", "3 draws". */
+export function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
