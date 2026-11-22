@@ -1,6 +1,6 @@
 import { httpsCallable } from "firebase/functions";
 import type {
-  CloneGameResponse, ExportSheetsPdfResponse, GenerateSheetsResponse, LiveRoundRequest, LiveRoundResponses,
+  AdminRequest, AdminResponses, CloneGameResponse, ExportSheetsPdfResponse, GenerateSheetsResponse, LiveRoundRequest, LiveRoundResponses,
   RedeemDisplayTokenResponse, ResetSheetsResponse,
 } from "@bingo/core";
 import { functions } from "./firebase";
@@ -11,6 +11,14 @@ export async function liveRound<A extends LiveRoundRequest["action"]>(
 ): Promise<LiveRoundResponses[A]> {
   const res = await httpsCallable(functions, "liveRound")(req);
   return res.data as LiveRoundResponses[A];
+}
+
+/** Calls the site-admin dispatcher with a typed action. */
+export async function adminCall<A extends AdminRequest["action"]>(
+  req: Extract<AdminRequest, { action: A }>,
+): Promise<AdminResponses[A]> {
+  const res = await httpsCallable(functions, "admin", { timeout: 300_000 })(req);
+  return res.data as AdminResponses[A];
 }
 
 async function call<Req, Res>(name: string, data: Req): Promise<Res> {

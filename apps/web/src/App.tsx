@@ -6,6 +6,8 @@ import { FullPageSpinner } from "./components/ui";
 const Landing = lazy(() => import("./pages/setup/Landing"));
 const GamesList = lazy(() => import("./pages/setup/GamesList"));
 const GameHub = lazy(() => import("./pages/setup/GameHub"));
+// Site admin panel.
+const AdminPanel = lazy(() => import("./pages/admin/AdminPanel"));
 // Live area: host console.
 const HostConsole = lazy(() => import("./pages/live/HostConsole"));
 // Player app.
@@ -24,6 +26,7 @@ export function App() {
         <Route path="/games" element={<GamesList />} />
         <Route path="/games/:gameId" element={<GameHub />} />
         <Route path="/games/:gameId/rounds/:sessionId" element={<HostConsole />} />
+        <Route path="/admin" element={<AdminPanel />} />
         <Route path="/present/:gameId/:sessionId" element={<Projector />} />
         <Route path="/display/:token" element={<DisplayRedeem />} />
         <Route path="/join" element={<Join />} />

@@ -37,9 +37,11 @@ export async function initFirebase(): Promise<void> {
   storage = getStorage(app);
   if (useEmulators) {
     const host = location.hostname;
-    connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
-    connectFirestoreEmulator(db, host, 8080);
-    connectFunctionsEmulator(functions, host, 5001);
-    connectStorageEmulator(storage, host, 9199);
+    // Shifts every emulator port, for emulators started on other ports (e.g. one set per worktree).
+    const off = Number(import.meta.env.VITE_EMULATOR_PORT_OFFSET ?? 0) || 0;
+    connectAuthEmulator(auth, `http://${host}:${9099 + off}`, { disableWarnings: true });
+    connectFirestoreEmulator(db, host, 8080 + off);
+    connectFunctionsEmulator(functions, host, 5001 + off);
+    connectStorageEmulator(storage, host, 9199 + off);
   }
 }

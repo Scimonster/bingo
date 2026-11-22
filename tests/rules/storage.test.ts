@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { assertFails, assertSucceeds, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import { deleteObject, getBytes, getMetadata, listAll, ref, uploadBytes } from "firebase/storage";
-import { anon, bucket, gameData, host, OTHER_HOST, OWNER, PLAYER, seed, setupEnv } from "./helpers";
+import { admin, anon, bucket, gameData, host, OTHER_HOST, OWNER, PLAYER, seed, setupEnv } from "./helpers";
 
 let env: RulesTestEnvironment;
 
@@ -95,6 +95,15 @@ describe("exports", () => {
     await assertSucceeds(getBytes(ref(bucket(host(env, OWNER)), pdf)));
   });
 
+  it("site admins can read any game's exports", async () => {
+    await assertSucceeds(getBytes(ref(bucket(admin(env)), pdf)));
+  });
+
+  it("an anonymous user with an admin claim cannot read exports", async () => {
+    const ctx = env.authenticatedContext(PLAYER, { firebase: { sign_in_provider: "anonymous" }, admin: true });
+    await assertFails(getBytes(ref(bucket(ctx), pdf)));
+  });
+
   it("others cannot read exports", async () => {
     await assertFails(getBytes(ref(bucket(host(env, OTHER_HOST)), pdf)));
     await assertFails(getBytes(ref(bucket(anon(env, PLAYER)), pdf)));
@@ -104,5 +113,7 @@ describe("exports", () => {
   it("nobody can write exports", async () => {
     await assertFails(uploadBytes(ref(bucket(host(env, OWNER)), "exports/g1/new.pdf"), bytes(10), { contentType: "application/pdf" }));
     await assertFails(deleteObject(ref(bucket(host(env, OWNER)), pdf)));
+    await assertFails(uploadBytes(ref(bucket(admin(env)), "exports/g1/new.pdf"), bytes(10), { contentType: "application/pdf" }));
+    await assertFails(deleteObject(ref(bucket(admin(env)), pdf)));
   });
 });

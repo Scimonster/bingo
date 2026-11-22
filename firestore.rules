@@ -24,14 +24,21 @@ service cloud.firestore {
       return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
+    // Site admin: a host whose ID token carries the custom claim admin == true (set with
+    // `pnpm admin:set`). Admins pass every owner check below, on every game.
+    function isAdmin() {
+      return isHost() && request.auth.token.get('admin', false) == true;
+    }
+
     // ---------------------------------------------------------------- game helpers
 
     function gameDoc(g) {
       return get(/databases/$(database)/documents/games/$(g));
     }
 
+    // The game's owner, or a site admin.
     function isOwner(g) {
-      return signedIn() && gameDoc(g).data.ownerId == uid();
+      return signedIn() && (isAdmin() || gameDoc(g).data.ownerId == uid());
     }
 
     function isLocked(g) {
@@ -211,9 +218,9 @@ service cloud.firestore {
     // ---------------------------------------------------------------- games
 
     match /games/{gameId} {
-      allow get: if signedIn() && (resource.data.ownerId == uid() || isMember(gameId));
-      // The "My games" list: where("ownerId", "==", uid).
-      allow list: if signedIn() && resource.data.ownerId == uid();
+      allow get: if signedIn() && (resource.data.ownerId == uid() || isAdmin() || isMember(gameId));
+      // The "My games" list: where("ownerId", "==", uid). Admins may list every game.
+      allow list: if signedIn() && (resource.data.ownerId == uid() || isAdmin());
 
       allow create: if isHost()
         && request.resource.data.keys().hasAll(['ownerId', 'title', 'createdAt', 'playerLanguage', 'settings', 'printLayout'])
@@ -223,7 +230,7 @@ service cloud.firestore {
         && validGameFields(request.resource.data, request.resource.data.keys());
 
       allow update: if isHost()
-        && resource.data.ownerId == uid()
+        && (resource.data.ownerId == uid() || isAdmin())
         && changed().hasOnly(['title', 'playerLanguage', 'settings', 'printLayout', 'customPatterns'])
         && validGameFields(request.resource.data, changed())
         && (!('settings' in changed()) || resource.data.get('contentLocked', false) != true || boardShapeUnchanged());

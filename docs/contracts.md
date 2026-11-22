@@ -1,6 +1,7 @@
 # Implementation contracts
 
-Clarifications on top of `docs/spec.md` that every part of the codebase must agree on. Types live in
+Clarifications on top of `docs/spec.md` that every part of the codebase must agree on.
+"Owner" below also covers site admins (see "Site admin"). Types live in
 `packages/core/src/types.ts`; callable request/response schemas in `packages/core/src/api.ts`.
 
 ## Firestore documents
@@ -67,6 +68,22 @@ Serials inside a round (`assignments` keys, `players.sheets`, `players.marks` ke
 - `users/{uid}/images/{imageId}/{thumb|print}.webp`: owner (non-anonymous) may create/overwrite;
   image/png|jpeg|webp|gif, < 10 MB. Any signed-in user may `get`; only the owner may `list`. No deletes.
 - `exports/{gameId}/{file}.pdf`: written by Functions; readable by the game owner only.
+
+## Site admin
+
+- An admin is a non-anonymous user whose ID token has the custom claim `admin: true`. Set it with
+  `pnpm admin:set <email> [--revoke] [--emulator]`; the user's token picks it up on the next refresh
+  (the `/admin` page forces one).
+- Rules: `isAdmin()` in both rule files. `isOwner(g)` is true for admins, so admins read and write
+  everything an owner can, on every game; they may also `get`/`list` every game doc. Exports are
+  readable by admins. No other extra rights.
+- Callables: `Ctx.isAdmin` comes from the verified token (`req.auth.token.admin === true`, never for
+  anonymous users). `requireOwner` accepts admins (`canManage`); an admin's `submitClaim` is decided
+  immediately like the owner's. `cloneGame` by an admin makes the admin the copy's owner.
+- `admin` callable (`adminRequestSchema`, `AdminResponses` in `packages/core/src/api.ts`), admins
+  only (`permission-denied` / reason `not-admin`): `overview`, `storage`, `runJob` (`cleanupImages` |
+  `endStaleRounds`). Moderation uses `liveRound` `endRound`, `deleteRound` and `deleteGame`.
+- Web: `useIsAdmin(user, refresh?)` in `lib/hooks.ts`; `adminCall` in `lib/callables.ts`.
 
 ## Shared sheet components — `@bingo/sheet`
 

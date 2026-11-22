@@ -8,6 +8,7 @@ import { liveRoundHandler } from "./handlers/liveRound";
 import { generateSheetsHandler, resetSheetsHandler } from "./handlers/sheets";
 import { cloneGameHandler, deleteGameHandler, deleteRoundHandler } from "./handlers/games";
 import { redeemDisplayTokenHandler } from "./handlers/round";
+import { adminHandler } from "./handlers/adminPanel";
 import { autoEndStaleRounds as autoEndStaleRoundsJob, cleanupUnreferencedImages as cleanupJob } from "./handlers/scheduled";
 
 setGlobalOptions({ region: "us-central1", maxInstances: 10 });
@@ -21,7 +22,8 @@ const enforceAppCheck = process.env.ENFORCE_APP_CHECK === "true";
 
 function ctxOf(req: CallableRequest): Ctx {
   const provider = (req.auth?.token.firebase as { sign_in_provider?: string } | undefined)?.sign_in_provider;
-  return { uid: req.auth?.uid ?? null, isAnonymous: provider === "anonymous" };
+  const isAnonymous = provider === "anonymous";
+  return { uid: req.auth?.uid ?? null, isAnonymous, isAdmin: !isAnonymous && req.auth?.token.admin === true };
 }
 
 function callable<R>(handler: (ctx: Ctx, data: unknown) => Promise<R>, opts: CallableOptions = {}) {
@@ -43,6 +45,8 @@ export const cloneGame = callable(cloneGameHandler);
 export const deleteGame = callable(deleteGameHandler, { timeoutSeconds: 300 });
 export const deleteRound = callable(deleteRoundHandler);
 export const redeemDisplayToken = callable(redeemDisplayTokenHandler);
+/** Site admin panel (custom claim admin == true). */
+export const admin = callable(adminHandler, { timeoutSeconds: 300, memory: "512MiB" });
 
 export const autoEndStaleRounds = onSchedule({ schedule: "every day 04:00", timeZone: "UTC" }, async () => {
   const n = await autoEndStaleRoundsJob();

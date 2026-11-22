@@ -5,7 +5,7 @@ import { SheetStyles } from "@bingo/sheet";
 import type { Claim, Player, Session } from "@bingo/core";
 import { db } from "../../lib/firebase";
 import { liveRound } from "../../lib/callables";
-import { useAuth, useCollection, useDoc } from "../../lib/hooks";
+import { useAuth, useCollection, useDoc, useIsAdmin } from "../../lib/hooks";
 import { Alert, Badge, Button, Card, Dialog, FullPageSpinner, cn } from "../../components/ui";
 import { useGameContent } from "../../components/live/content";
 import { JoinQR, joinUrl } from "../../components/live/JoinQR";
@@ -28,7 +28,9 @@ export default function HostConsole() {
   const signedIn = !!user && !user.isAnonymous;
   const sessionPath = `games/${gameId}/sessions/${sessionId}`;
   const content = useGameContent(gameId, signedIn);
-  const isOwner = !!user && content.game.data?.ownerId === user.uid;
+  const admin = useIsAdmin(user);
+  // Site admins get the full console on any host's round.
+  const isOwner = !!user && !!content.game.data && (content.game.data.ownerId === user.uid || admin.isAdmin);
   const session = useDoc<Session>(isOwner ? sessionPath : null);
   const players = useCollection<Player>(isOwner ? `${sessionPath}/players` : null, [orderBy("joinedAt")], "byJoin");
   const claims = useCollection<Claim>(isOwner ? `${sessionPath}/claims` : null, [orderBy("createdAt", "desc"), limit(40)], "recent");
@@ -46,7 +48,7 @@ export default function HostConsole() {
     return () => clearInterval(t);
   }, [isOwner, running]);
 
-  if (authLoading || (signedIn && content.game.loading) || (isOwner && session.loading)) return <FullPageSpinner />;
+  if (authLoading || admin.loading || (signedIn && content.game.loading) || (isOwner && session.loading)) return <FullPageSpinner />;
   if (!signedIn)
     return (
       <Centered>
