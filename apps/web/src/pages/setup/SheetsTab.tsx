@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doc, getDoc, orderBy, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref as storageRef } from "firebase/storage";
 import { useQuery } from "@tanstack/react-query";
@@ -21,8 +21,27 @@ type SheetDoc = Sheet & { id: string };
 const SAMPLE_COUNT = 3;
 const PAGE_SIZE = 60;
 
+const AUTOSAVE_MS = 800;
+
 function normalizeLayout(l: PrintLayout, n: number): PrintLayout {
   return { ...l, slotLabels: syncSlotLabels(l.slotLabels, n) };
+}
+
+/** The form of a draft layout that is written to Firestore. */
+function toStored(draft: PrintLayout): PrintLayout {
+  return clean({
+    ...draft,
+    heading: draft.heading?.trim() ?? "",
+    slotLabels: draft.slotLabels.map((s) => s.trim()),
+    infoText: sanitizeInfoText(draft.infoText, LIMITS.infoTextMax),
+  });
+}
+
+/** JSON with sorted object keys, so layouts compare equal whatever order Firestore returns fields in. */
+function stableKey(v: unknown): string {
+  return JSON.stringify(v, (_k, x: unknown) =>
+    x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : x,
+  );
 }
 
 export function SheetsTab(props: TabProps) {
@@ -31,9 +50,18 @@ export function SheetsTab(props: TabProps) {
   const n = game.settings.boardsPerSheet;
   const stored = useMemo(() => normalizeLayout(game.printLayout, n), [game.printLayout, n]);
   const [draft, setDraft] = useState<PrintLayout>(stored);
-  const storedKey = JSON.stringify(stored);
-  useEffect(() => setDraft(JSON.parse(storedKey) as PrintLayout), [storedKey]);
-  const dirty = JSON.stringify(draft) !== storedKey;
+  const storedKey = stableKey(stored);
+  const draftKey = stableKey(toStored(draft));
+  const dirty = draftKey !== storedKey;
+  const ownKeys = useRef(new Set<string>()).current;
+  const draftKeyRef = useRef(draftKey);
+  draftKeyRef.current = draftKey;
+  // Adopt layouts changed elsewhere (another tab, a settings change). Our own saves come back as
+  // keys we wrote, so the draft — possibly with untrimmed text mid-typing — is left alone.
+  useEffect(() => {
+    if (storedKey !== draftKeyRef.current && !ownKeys.has(storedKey)) setDraft(JSON.parse(storedKey) as PrintLayout);
+  }, [storedKey, ownKeys]);
+  const saveState = useLayoutAutoSave(gameId, draft, draftKey, dirty, ownKeys);
   const [view, setView] = useState<"samples" | "sheets">("samples");
   const hasSheets = sheets.data.length > 0;
   useEffect(() => {
@@ -49,7 +77,7 @@ export function SheetsTab(props: TabProps) {
         <Card className="space-y-3 self-start">
           <h2 className="text-lg font-semibold">Print layout</h2>
           <PrintLayoutEditor layout={draft} settings={game.settings} uid={props.user.uid} onChange={setDraft} />
-          <SaveLayoutBar gameId={gameId} draft={draft} dirty={dirty} onDiscard={() => setDraft(stored)} />
+          <SaveStatus state={saveState.state} dirty={dirty} onRetry={saveState.retry} />
         </Card>
         <Card className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -60,7 +88,6 @@ export function SheetsTab(props: TabProps) {
                 </button>
               ))}
             </div>
-            {dirty && <span className="text-xs text-amber-700">Preview shows unsaved layout changes</span>}
           </div>
           {view === "samples" ? <Samples {...props} layout={draft} /> : <Browse {...props} layout={draft} sheets={sheets.data} loading={sheets.loading} />}
         </Card>
@@ -70,39 +97,65 @@ export function SheetsTab(props: TabProps) {
   );
 }
 
-function SaveLayoutBar({ gameId, draft, dirty, onDiscard }: { gameId: string; draft: PrintLayout; dirty: boolean; onDiscard: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ kind: "error" | "success"; text: string } | null>(null);
-  useEffect(() => {
-    if (dirty) setMsg(null);
-  }, [dirty]);
-  const save = async () => {
-    setBusy(true);
-    setMsg(null);
+type SaveState = { kind: "idle" | "saving" | "saved" } | { kind: "error"; text: string };
+
+/**
+ * Saves the draft layout a moment after the last edit, and right away when the tab unmounts.
+ * Only the latest save reports its outcome; a failed save waits for the next edit or a retry.
+ */
+function useLayoutAutoSave(gameId: string, draft: PrintLayout, draftKey: string, dirty: boolean, ownKeys: Set<string>) {
+  const [state, setState] = useState<SaveState>({ kind: "idle" });
+  const latest = useRef({ draft, dirty });
+  latest.current = { draft, dirty };
+  const seq = useRef(0);
+  const save = useCallback(async () => {
+    if (!latest.current.dirty) return;
+    const layout = toStored(latest.current.draft);
+    ownKeys.add(stableKey(layout));
+    const mine = ++seq.current;
+    setState({ kind: "saving" });
     try {
-      const layout: PrintLayout = clean({
-        ...draft,
-        heading: draft.heading?.trim() ?? "",
-        slotLabels: draft.slotLabels.map((s) => s.trim()),
-        infoText: sanitizeInfoText(draft.infoText, LIMITS.infoTextMax),
-      });
       await updateDoc(doc(db, "games", gameId), { printLayout: layout });
-      setMsg({ kind: "success", text: "Layout saved" });
+      if (mine === seq.current) setState({ kind: "saved" });
     } catch (e) {
-      setMsg({ kind: "error", text: errorMessage(e) });
-    } finally {
-      setBusy(false);
+      if (mine === seq.current) setState({ kind: "error", text: errorMessage(e) });
     }
-  };
+  }, [gameId, ownKeys]);
+  useEffect(() => {
+    if (!dirty) return;
+    const t = setTimeout(() => void save(), AUTOSAVE_MS);
+    return () => clearTimeout(t);
+  }, [draftKey, dirty, save]);
+  useEffect(() => () => void save(), [save]);
+  const pending = dirty || state.kind === "saving";
+  useEffect(() => {
+    if (!pending) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [pending]);
+  return { state, retry: () => void save() };
+}
+
+function SaveStatus({ state, dirty, onRetry }: { state: SaveState; dirty: boolean; onRetry: () => void }) {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
-      {msg && <Alert kind={msg.kind} className="me-auto">{msg.text}</Alert>}
-      <Button variant="outline" size="sm" disabled={!dirty || busy} onClick={onDiscard}>
-        Discard
-      </Button>
-      <Button size="sm" disabled={!dirty || busy} onClick={save}>
-        {busy ? "Saving…" : "Save layout"}
-      </Button>
+    <div className="flex min-h-9 flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3 text-xs" aria-live="polite">
+      {state.kind === "error" ? (
+        <>
+          <Alert kind="error" className="me-auto">
+            Couldn't save the layout: {state.text}
+          </Alert>
+          <Button size="sm" variant="outline" onClick={onRetry}>
+            Retry
+          </Button>
+        </>
+      ) : dirty || state.kind === "saving" ? (
+        <span className="text-slate-500">Saving…</span>
+      ) : state.kind === "saved" ? (
+        <span className="text-emerald-700">All changes saved</span>
+      ) : (
+        <span className="text-slate-500">Changes save automatically</span>
+      )}
     </div>
   );
 }
