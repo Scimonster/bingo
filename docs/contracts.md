@@ -68,6 +68,20 @@ Serials inside a round (`assignments` keys, `players.sheets`, `players.marks` ke
   image/png|jpeg|webp|gif, < 10 MB. Any signed-in user may `get`; only the owner may `list`. No deletes.
 - `exports/{gameId}/{file}.pdf`: written by Functions; readable by the game owner only.
 
+## Info box — `printLayout.infoText`, `infoMode`, `infoImage`, `infoImageFit`
+
+`infoText` (≤ 3000 chars) is the markup defined in `packages/core/src/markdown.ts`: blocks are
+paragraphs, `# `/`## ` headings, `- `/`1. ` list items and image lines `![s|m|l](users/{uid}/images/{id})`,
+optionally prefixed with `{center} ` or `{end} `; inline `**bold**`, `_italic_`, `++underline++`,
+`[text]{red large}` (colours `INFO_COLORS`, sizes `INFO_SIZES`); `\` escapes markers. Clients write
+it with `serializeInfoText` (the editor) and `sanitizeInfoText`; everyone reads it with
+`parseInfoText` (AST, never HTML). Image lines with any other path are plain text.
+
+`infoMode: "image"` with `infoImage` (an image folder) shows that image in the info box instead of the
+text; `infoImageFit` is `"contain"` (default) or `"cover"`. `printLayoutImages(pl)` lists every image a
+layout references (cleanup keeps them all); `printLayoutRenderImages(pl)` only those a sheet shows (PDF
+export loads them).
+
 ## Shared sheet components — `@bingo/sheet`
 
 ```ts
@@ -85,8 +99,9 @@ makeResolver(items: Record<string, { type: "text"|"image"; text?: string; storag
 <ItemCell view variant="screen"|"print" />
 <BoardGrid cells rows cols resolve variant? marked?: ReadonlySet<number> highlighted?: ReadonlySet<number>
            onCellClick?: (index) => void label?: string className? />
-<SheetLayout serial boards={string[][] /* index = slot */} settings printLayout lang resolve qrSvg />
-<InfoText md />
+<SheetLayout serial boards={string[][] /* index = slot */} settings printLayout lang resolve qrSvg
+             backgroundUrl? imageUrl?: (storagePath) => string | undefined /* info images */ />
+<InfoText md imageUrl? boxHeightMm? />
 qrSvg(text: string): Promise<string>  // SVG markup
 renderSheetsHtml({ pages: SheetLayoutProps[], fontCss: string, lang }): string // full HTML doc for Puppeteer
 ```

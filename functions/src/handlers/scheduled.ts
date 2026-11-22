@@ -1,5 +1,5 @@
 import { logger } from "firebase-functions";
-import { DAY_MS, LIMITS, type Game, type Session } from "@bingo/core";
+import { DAY_MS, LIMITS, printLayoutImages, type Game, type Session } from "@bingo/core";
 import { bucket, db } from "../admin";
 import { endRoundInternal } from "./round";
 
@@ -28,8 +28,8 @@ export async function autoEndStaleRounds(now = Date.now()): Promise<number> {
 const IMAGE_FOLDER = /^(users\/[^/]+\/images\/[^/]+)\//;
 
 /**
- * Deletes image folders (users/{uid}/images/{id}/) older than a day that no item or free-space
- * content references, and export PDFs older than 7 days (backstop for the bucket lifecycle rule).
+ * Deletes image folders (users/{uid}/images/{id}/) older than a day that no item, free-space
+ * content or print layout (background, info box) references, and export PDFs older than 7 days (backstop for the bucket lifecycle rule).
  */
 export async function cleanupUnreferencedImages(now = Date.now()): Promise<{ images: number; exports: number }> {
   const referenced = new Set<string>();
@@ -38,10 +38,12 @@ export async function cleanupUnreferencedImages(now = Date.now()): Promise<{ ima
     const p = d.get("storagePath");
     if (typeof p === "string") referenced.add(p);
   }
-  const games = await db().collection("games").select("settings").get();
+  const games = await db().collection("games").select("settings", "printLayout").get();
   for (const d of games.docs) {
-    const p = (d.data() as Partial<Game>).settings?.freeSpace?.content?.storagePath;
+    const g = d.data() as Partial<Game>;
+    const p = g.settings?.freeSpace?.content?.storagePath;
     if (typeof p === "string") referenced.add(p);
+    if (g.printLayout) for (const q of printLayoutImages(g.printLayout)) referenced.add(q);
   }
 
   const b = bucket();

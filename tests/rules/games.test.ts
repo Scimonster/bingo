@@ -86,7 +86,18 @@ describe("games: create", () => {
             boardsPerSheet: 4,
             freeSpace: { enabled: true, row: 4, col: 4, content: { type: "image", storagePath: "users/owner/images/x", text: "Free" } },
           }),
-          printLayout: printLayout({ heading: "H", slotLabels: ["a", "b", "c", "d"], infoText: "x".repeat(1500), arrangement: "grid" }),
+          printLayout: printLayout({
+            heading: "H",
+            slotLabels: ["a", "b", "c", "d"],
+            infoText: "x".repeat(3000),
+            arrangement: "grid",
+            infoMode: "image",
+            infoImage: "users/owner/images/info",
+            infoImageFit: "cover",
+            backgroundColor: "#ffeeaa",
+            backgroundImage: "users/owner/images/bg",
+            backgroundOpacity: 0.5,
+          }),
         }),
       ),
     );
@@ -163,8 +174,12 @@ describe("games: create", () => {
   });
 
   it("validates the print layout", async () => {
-    await assertSucceeds(create(OWNER, newGame({ printLayout: printLayout({ infoText: "x".repeat(1500) }) })));
-    await assertFails(create(OWNER, newGame({ printLayout: printLayout({ infoText: "x".repeat(1501) }) })));
+    await assertSucceeds(create(OWNER, newGame({ printLayout: printLayout({ infoText: "x".repeat(3000) }) })));
+    await assertFails(create(OWNER, newGame({ printLayout: printLayout({ infoText: "x".repeat(3001) }) })));
+    await assertSucceeds(create(OWNER, newGame({ printLayout: printLayout({ infoMode: "text", infoImageFit: "contain" }) })));
+    await assertFails(create(OWNER, newGame({ printLayout: printLayout({ infoMode: "html" }) })));
+    await assertFails(create(OWNER, newGame({ printLayout: printLayout({ infoImage: "https://evil.test/x.png" }) })));
+    await assertFails(create(OWNER, newGame({ printLayout: printLayout({ infoImageFit: "stretch" }) })));
     await assertFails(create(OWNER, newGame({ printLayout: printLayout({ slotLabels: ["a", "b", "c", "d", "e"] }) })));
     await assertFails(create(OWNER, newGame({ printLayout: printLayout({ slotLabels: ["a", "x".repeat(41)] }) })));
     await assertFails(create(OWNER, newGame({ printLayout: printLayout({ slotLabels: ["a", 7] }) })));
@@ -244,7 +259,8 @@ describe("games: update and delete", () => {
     await assertSucceeds(updateDoc(ownerGame(), { title: "New title" }));
     await assertSucceeds(updateDoc(ownerGame(), { playerLanguage: "en" }));
     await assertSucceeds(updateDoc(ownerGame(), { settings: settings({ rows: 4, cols: 4, freeSpace: { enabled: false, row: 0, col: 0 } }) }));
-    await assertSucceeds(updateDoc(ownerGame(), { "printLayout.infoText": "**Hello**" }));
+    await assertSucceeds(updateDoc(ownerGame(), { "printLayout.infoText": "# Hello\n\n{center} ![m](users/owner/images/x)" }));
+    await assertSucceeds(updateDoc(ownerGame(), { "printLayout.infoMode": "image", "printLayout.infoImage": "users/owner/images/x" }));
     await assertSucceeds(updateDoc(ownerGame(), { customPatterns: [pattern(1)] }));
   });
 
@@ -252,7 +268,8 @@ describe("games: update and delete", () => {
     await assertFails(updateDoc(ownerGame(), { title: "" }));
     await assertFails(updateDoc(ownerGame(), { "settings.rows": 10 }));
     await assertFails(updateDoc(ownerGame(), { "settings.freeSpace.row": 5 }));
-    await assertFails(updateDoc(ownerGame(), { "printLayout.infoText": "x".repeat(1501) }));
+    await assertFails(updateDoc(ownerGame(), { "printLayout.infoText": "x".repeat(3001) }));
+    await assertFails(updateDoc(ownerGame(), { "printLayout.infoMode": 1 }));
     await assertFails(updateDoc(ownerGame(), { customPatterns: Array.from({ length: 21 }, (_, i) => pattern(i)) }));
   });
 

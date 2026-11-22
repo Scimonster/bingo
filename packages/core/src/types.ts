@@ -30,11 +30,19 @@ export interface GameSettings {
   boardsPerSheet: number;
 }
 
+export type InfoMode = "text" | "image";
+
 export interface PrintLayout {
   heading?: string;
   slotLabels: string[];
-  /** Sanitized Markdown subset: bold, italic, lists, line breaks. */
+  /** Info-text markup (see markdown.ts): rich text with headings, colours, sizes, alignment and images. */
   infoText: string;
+  /** What the info area shows: the text (default) or one image filling it (`infoImage`). */
+  infoMode?: InfoMode;
+  /** Full info-area image: users/{uid}/images/{imageId} (print variant is used). */
+  infoImage?: string;
+  /** How `infoImage` fills the area: whole image (default) or cropped to fill. */
+  infoImageFit?: "contain" | "cover";
   paperSize: PaperSize;
   orientation: Orientation;
   arrangement: Arrangement;

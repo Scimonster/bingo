@@ -4,7 +4,7 @@ export const LIMITS = {
   gridMax: 9,
   boardsPerSheetMin: 1,
   boardsPerSheetMax: 4,
-  infoTextMax: 1500,
+  infoTextMax: 3000,
   textItemMax: 200,
   titleMax: 100,
   slotLabelMax: 40,

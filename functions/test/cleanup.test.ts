@@ -13,12 +13,17 @@ describe("cleanupUnreferencedImages", () => {
     const base = `users/${host.uid}/images`;
     const save = (p: string) => bucket().file(p).save(Buffer.from("x"), { contentType: "image/webp" });
     await Promise.all(
-      ["used", "free", "orphan"].flatMap((id) => [save(`${base}/${id}/thumb.webp`), save(`${base}/${id}/print.webp`)]),
+      ["used", "free", "bg", "infoFull", "infoInline", "orphan"].flatMap((id) => [save(`${base}/${id}/thumb.webp`), save(`${base}/${id}/print.webp`)]),
     );
     await bucket().file(`exports/${gameId}/sheets.pdf`).save(Buffer.from("%PDF"), { contentType: "application/pdf" });
     const g = db().collection("games").doc(gameId);
     await g.collection("items").doc("img").set({ type: "image", storagePath: `${base}/used`, createdAt: 1 });
-    await g.update({ "settings.freeSpace.content": { type: "image", storagePath: `${base}/free` } });
+    await g.update({
+      "settings.freeSpace.content": { type: "image", storagePath: `${base}/free` },
+      "printLayout.backgroundImage": `${base}/bg`,
+      "printLayout.infoImage": `${base}/infoFull`,
+      "printLayout.infoText": `Hi\n\n![m](${base}/infoInline)`,
+    });
 
     // Fresh uploads are kept even when unreferenced (an item doc may not be written yet).
     await cleanupUnreferencedImages();
@@ -29,6 +34,7 @@ describe("cleanupUnreferencedImages", () => {
     expect(await exists(`${base}/orphan/print.webp`)).toBe(false);
     expect(await exists(`${base}/used/print.webp`)).toBe(true);
     expect(await exists(`${base}/free/thumb.webp`)).toBe(true);
+    for (const id of ["bg", "infoFull", "infoInline"]) expect(await exists(`${base}/${id}/print.webp`)).toBe(true);
     expect(await exists(`exports/${gameId}/sheets.pdf`)).toBe(true);
 
     await cleanupUnreferencedImages(Date.now() + 8 * DAY_MS);

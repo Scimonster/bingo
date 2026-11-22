@@ -81,6 +81,30 @@ describe("PDF export rendering", () => {
     expect(html).toContain("data:image/svg+xml;base64");
   });
 
+  it("draws info-box images and the full info image from the loaded images", async () => {
+    const rich: PdfInput = {
+      ...input,
+      game: {
+        ...input.game,
+        printLayout: { ...printLayout, arrangement: "grid", infoText: "# כללים\n\n{center} [Win]{red large} ++big++\n\n![m](users/u/images/2)" },
+      },
+    };
+    const html = await buildSheetsHtml(rich);
+    expect(html).toContain('<h2 dir="auto" class="bs-md-h1">כללים</h2>');
+    expect(html).toContain(`<div class="bs-md-img bs-md-img--m" style="text-align:center"><img src="${input.images["users/u/images/2"]}"`);
+    const full: PdfInput = {
+      ...input,
+      game: { ...input.game, printLayout: { ...printLayout, infoMode: "image", infoImage: "users/u/images/1" } },
+    };
+    const fullHtml = await buildSheetsHtml(full);
+    expect(fullHtml).toContain(`<img class="bs-info-img" src="${input.images["users/u/images/1"]}"`);
+    expect(fullHtml).not.toContain("ברוכים הבאים");
+    if (chrome && process.env.PDF_OUT) {
+      writeFileSync(`${process.env.PDF_OUT}.rich.pdf`, await renderSheetsPdf(rich, { executablePath: chrome }));
+      writeFileSync(`${process.env.PDF_OUT}.full.pdf`, await renderSheetsPdf(full, { executablePath: chrome }));
+    }
+  }, 120_000);
+
   it.skipIf(!chrome)(
     "renders a 3-page PDF with a local Chrome",
     async () => {

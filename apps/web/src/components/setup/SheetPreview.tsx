@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { pageSizeMm, type Game, type Item, type PrintLayout } from "@bingo/core";
+import { pageSizeMm, printLayoutRenderImages, type Game, type Item, type PrintLayout } from "@bingo/core";
 import { SheetLayout, SheetStyles, makeResolver, qrSvg, type Resolve, type SheetLayoutProps } from "@bingo/sheet";
 import { useImageUrls } from "../../lib/hooks";
 
@@ -20,6 +20,15 @@ export function useSheetResolver(game: Pick<Game, "settings">, items: Item[], va
 export function useBackgroundUrl(layout: Pick<PrintLayout, "backgroundImage">): string | undefined {
   const urls = useImageUrls([layout.backgroundImage], "print");
   return layout.backgroundImage ? urls[layout.backgroundImage] : undefined;
+}
+
+/**
+ * Resolver for the layout's info-box images (print variant), for `SheetLayoutProps.imageUrl`.
+ * Stable while the URLs don't change.
+ */
+export function useLayoutImageUrl(layout: Parameters<typeof printLayoutRenderImages>[0]): (storagePath: string) => string | undefined {
+  const urls = useImageUrls(printLayoutRenderImages(layout), "print");
+  return useMemo(() => (p: string) => urls[p], [urls]);
 }
 
 /** QR SVG markup for a text (async). */
