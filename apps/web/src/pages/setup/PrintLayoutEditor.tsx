@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { INFO_BLOCK, LIMITS, MIN_CELL_MM, blockOrder, layoutMetrics, type Arrangement, type GameSettings, type Orientation, type PaperSize, type PrintLayout } from "@bingo/core";
+import { INFO_BLOCK, LIMITS, MIN_CELL_MM, blockOrder, hasInfoContent, layoutMetrics, type Arrangement, type GameSettings, type Orientation, type PaperSize, type PrintLayout } from "@bingo/core";
 import { Alert, Button, Input, Label, Select, Spinner } from "../../components/ui";
-import { InfoTextEditor } from "../../components/setup/InfoTextEditor";
+import { InfoBoxEditor } from "../../components/setup/InfoBoxEditor";
 import { useImageUrls } from "../../lib/hooks";
 import { uploadImage } from "../../lib/images";
 import { errorMessage } from "../../lib/callables";
@@ -25,7 +25,7 @@ const ARRANGEMENTS: { id: Arrangement; label: string; min?: number; max?: number
 export function PrintLayoutEditor({ layout, settings, uid, onChange }: { layout: PrintLayout; settings: GameSettings; uid: string; onChange: (l: PrintLayout) => void }) {
   const set = <K extends keyof PrintLayout>(k: K, v: PrintLayout[K]) => onChange({ ...layout, [k]: v });
   const n = settings.boardsPerSheet;
-  const m = layoutMetrics({ ...layout, boardsPerSheet: n, rows: settings.rows, cols: settings.cols, stretch: !!layout.stretch, hasInfo: !!layout.infoText.trim() });
+  const m = layoutMetrics({ ...layout, boardsPerSheet: n, rows: settings.rows, cols: settings.cols, stretch: !!layout.stretch, hasInfo: hasInfoContent(layout) });
   const arrangements = ARRANGEMENTS.filter((a) => (a.min === undefined || n >= a.min) && (a.max === undefined || n <= a.max));
   return (
     <div className="space-y-3">
@@ -53,11 +53,7 @@ export function PrintLayoutEditor({ layout, settings, uid, onChange }: { layout:
           ))}
         </div>
       </fieldset>
-      <div>
-        <Label htmlFor="pl-info">Info text (same on every sheet)</Label>
-        <InfoTextEditor id="pl-info" value={layout.infoText} onChange={(v) => set("infoText", v)} />
-        <p className="mt-1 text-xs text-slate-500">**bold**, *italic*, "- " bullets, "1. " numbered lists. {!m.hasInfoArea && "This layout has no info area."}</p>
-      </div>
+      <InfoBoxEditor layout={layout} uid={uid} hasInfoArea={m.hasInfoArea} onChange={onChange} />
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label htmlFor="pl-paper">Paper</Label>

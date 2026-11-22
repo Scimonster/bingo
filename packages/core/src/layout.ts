@@ -1,4 +1,5 @@
-import type { Arrangement, Orientation, PaperSize } from "./types";
+import { infoTextImages, parseInfoText } from "./markdown";
+import type { Arrangement, Orientation, PaperSize, PrintLayout } from "./types";
 
 /** Portrait paper dimensions in mm. */
 export const PAPER_SIZES_MM: Record<PaperSize, { w: number; h: number }> = {
@@ -119,4 +120,35 @@ export function layoutMetrics(opts: {
   const cellMm = Math.min(cellW, cellH);
   const boardMm = Math.max(boardW, boardH);
   return { page, boardW, boardH, cellW, cellH, boardMm, cellMm, tooSmall: cellMm < MIN_CELL_MM, hasInfoArea };
+}
+
+/** Whether the info area shows the full image (image mode with an image set). */
+export function infoShowsImage(pl: Pick<PrintLayout, "infoMode" | "infoImage">): boolean {
+  return pl.infoMode === "image" && !!pl.infoImage;
+}
+
+/** Whether the info area has anything to show (text blocks or the full image). */
+export function hasInfoContent(pl: Pick<PrintLayout, "infoText" | "infoMode" | "infoImage">): boolean {
+  if (pl.infoMode === "image") return !!pl.infoImage;
+  return parseInfoText(pl.infoText ?? "").length > 0;
+}
+
+/**
+ * Image folders a print layout references (background, info-text images, full info image),
+ * whichever mode is active, so image cleanup keeps them all.
+ */
+export function printLayoutImages(pl: Pick<PrintLayout, "infoText" | "infoImage" | "backgroundImage">): string[] {
+  const out = new Set<string>(infoTextImages(pl.infoText ?? ""));
+  if (pl.infoImage) out.add(pl.infoImage);
+  if (pl.backgroundImage) out.add(pl.backgroundImage);
+  return [...out];
+}
+
+/** Image folders a sheet render needs from the layout (only the active info mode). */
+export function printLayoutRenderImages(pl: Pick<PrintLayout, "infoText" | "infoMode" | "infoImage" | "backgroundImage">): string[] {
+  const out = new Set<string>();
+  if (pl.backgroundImage) out.add(pl.backgroundImage);
+  if (infoShowsImage(pl)) out.add(pl.infoImage!);
+  else if (pl.infoMode !== "image") for (const p of infoTextImages(pl.infoText ?? "")) out.add(p);
+  return [...out];
 }

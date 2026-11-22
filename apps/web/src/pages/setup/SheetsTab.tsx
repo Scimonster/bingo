@@ -9,7 +9,7 @@ import {
 import { SheetLayout, type SheetLayoutProps } from "@bingo/sheet";
 import { Alert, Button, Card, Input, Label, Spinner, cn } from "../../components/ui";
 import { ConfirmDialog, EmptyState } from "../../components/setup/common";
-import { FullSizePreview, PrintPortal, ScaledSheet, SetupSheetCss, useBackgroundUrl, useQrSvg, useSheetResolver } from "../../components/setup/SheetPreview";
+import { FullSizePreview, PrintPortal, ScaledSheet, SetupSheetCss, useBackgroundUrl, useLayoutImageUrl, useQrSvg, useSheetResolver } from "../../components/setup/SheetPreview";
 import { parseSerialRange, syncSlotLabels } from "../../components/setup/helpers";
 import { useCollection } from "../../lib/hooks";
 import { db, storage } from "../../lib/firebase";
@@ -241,6 +241,7 @@ function Samples({ game, items, layout }: TabProps & { layout: PrintLayout }) {
   const resolve = useSheetResolver(game, items);
   const qr = useQrSvg("SAMPLE");
   const backgroundUrl = useBackgroundUrl(layout);
+  const imageUrl = useLayoutImageUrl(layout);
   const [full, setFull] = useState(false);
   const itemIds = useMemo(() => items.map((i) => i.id), [items]);
   const result = useMemo(() => {
@@ -259,7 +260,7 @@ function Samples({ game, items, layout }: TabProps & { layout: PrintLayout }) {
     );
   }
   const sheet = result.sheets[Math.min(idx, result.sheets.length - 1)]!;
-  const p: SheetLayoutProps = { serial: 0, boards: sheet.boards.map((b) => b.cells), settings: game.settings, printLayout: layout, lang: game.playerLanguage, resolve, qrSvg: qr, backgroundUrl };
+  const p: SheetLayoutProps = { serial: 0, boards: sheet.boards.map((b) => b.cells), settings: game.settings, printLayout: layout, lang: game.playerLanguage, resolve, qrSvg: qr, backgroundUrl, imageUrl };
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -312,6 +313,7 @@ function Browse({ gameId, game, items, layout, sheets, loading }: TabProps & { l
   const resolve = useSheetResolver(game, items);
   const printResolve = useSheetResolver(game, items, "print");
   const backgroundUrl = useBackgroundUrl(layout);
+  const imageUrl = useLayoutImageUrl(layout);
   const [full, setFull] = useState(false);
   const qr = useQrSvg(sheet ? `${location.origin}${sheetQrPath(gameId, sheet.serial)}` : "");
   const pages = Math.ceil(sheets.length / PAGE_SIZE);
@@ -324,7 +326,7 @@ function Browse({ gameId, game, items, layout, sheets, loading }: TabProps & { l
     setSel(c);
     setPage(Math.floor(c / PAGE_SIZE));
   };
-  const p: SheetLayoutProps | null = sheet && boards.data ? { serial: sheet.serial, boards: boards.data, settings: game.settings, printLayout: layout, lang: game.playerLanguage, resolve, qrSvg: qr, backgroundUrl } : null;
+  const p: SheetLayoutProps | null = sheet && boards.data ? { serial: sheet.serial, boards: boards.data, settings: game.settings, printLayout: layout, lang: game.playerLanguage, resolve, qrSvg: qr, backgroundUrl, imageUrl } : null;
 
   return (
     <div className="space-y-3">

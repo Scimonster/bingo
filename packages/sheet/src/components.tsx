@@ -1,7 +1,7 @@
-import { parseInfoText, type Inline } from "@bingo/core";
+import { INFO_COLORS, INFO_SIZES, parseInfoText, type InfoAlign, type Inline } from "@bingo/core";
 import type { CSSProperties, ReactNode } from "react";
 import { sheetCss } from "./css";
-import { fitFontSize } from "./fit";
+import { fitFontSize, IMAGE_WIDTH_SHARE, planInfo } from "./fit";
 import { cellLabel, type CellView, type Resolve } from "./resolve";
 
 export type Variant = "screen" | "print";
@@ -181,20 +181,57 @@ function renderInline(nodes: Inline[]): ReactNode[] {
         return <b key={i}>{renderInline(n.c)}</b>;
       case "i":
         return <i key={i}>{renderInline(n.c)}</i>;
+      case "u":
+        return <u key={i}>{renderInline(n.c)}</u>;
+      case "span":
+        return (
+          <span
+            key={i}
+            style={{
+              ...(n.color ? { color: INFO_COLORS[n.color] } : null),
+              ...(n.size ? { fontSize: `${INFO_SIZES[n.size]}em` } : null),
+            }}
+          >
+            {renderInline(n.c)}
+          </span>
+        );
     }
   });
 }
 
-/** Renders the info-text Markdown subset (parsed to an AST; never raw HTML). */
-export function InfoText({ md, className, style }: { md: string; className?: string; style?: CSSProperties }) {
+const alignStyle = (a?: InfoAlign): CSSProperties | undefined => (a ? { textAlign: a } : undefined);
+const mmv = (v: number) => `${Math.max(0, Math.round(v * 100) / 100)}mm`;
+
+export interface InfoTextProps {
+  md: string;
+  className?: string;
+  style?: CSSProperties;
+  /** Turns an image folder (users/{uid}/images/{id}) into a URL; images without one are skipped. */
+  imageUrl?: (storagePath: string) => string | undefined;
+  /** Height (mm) of the info box, so images get their share of it. Otherwise images use em sizes. */
+  boxHeightMm?: number;
+}
+
+/** Renders the info-text format (parsed to an AST; never raw HTML). */
+export function InfoText({ md, className, style, imageUrl, boxHeightMm }: InfoTextProps) {
   const blocks = parseInfoText(md);
   if (!blocks.length) return null;
+  const plan = boxHeightMm !== undefined ? planInfo(blocks, boxHeightMm) : null;
+  let img = 0;
   return (
     <div className={["bs-md", className].filter(Boolean).join(" ")} style={style}>
       {blocks.map((b, i) => {
         switch (b.t) {
           case "p":
-            return <p key={i} dir="auto">{renderInline(b.c)}</p>;
+            return <p key={i} dir="auto" style={alignStyle(b.align)}>{renderInline(b.c)}</p>;
+          case "h": {
+            const H = b.level === 1 ? "h2" : "h3";
+            return (
+              <H key={i} dir="auto" className={`bs-md-h${b.level}`} style={alignStyle(b.align)}>
+                {renderInline(b.c)}
+              </H>
+            );
+          }
           case "ul":
             return (
               <ul key={i} dir="auto">
@@ -211,6 +248,25 @@ export function InfoText({ md, className, style }: { md: string; className?: str
                 ))}
               </ol>
             );
+          case "img": {
+            const maxMm = plan?.imageMm[img++];
+            const url = imageUrl?.(b.path);
+            return (
+              <div key={i} className={`bs-md-img bs-md-img--${b.size}`} style={alignStyle(b.align ?? "center")}>
+                {url ? (
+                  <img
+                    src={url}
+                    alt=""
+                    draggable={false}
+                    style={{
+                      maxWidth: `${IMAGE_WIDTH_SHARE[b.size] * 100}%`,
+                      ...(maxMm !== undefined ? { maxHeight: mmv(maxMm) } : null),
+                    }}
+                  />
+                ) : null}
+              </div>
+            );
+          }
         }
       })}
     </div>

@@ -241,6 +241,49 @@ describe("SheetLayout", () => {
   });
 });
 
+describe("info box", () => {
+  const IMG = "users/u/images/info1";
+  const imageUrl = (p: string) => `https://img.test/${p}/print.webp`;
+  const rich = `# Rules\n\n{center} Win [big]{red large} ++prizes++\n\n{end} ![s](${IMG})`;
+
+  it("renders headings, colour, size, underline, alignment and images", () => {
+    for (const arrangement of ["grid", "row"] as const) {
+      const html = renderToStaticMarkup(<SheetLayout {...props({ printLayout: layout({ arrangement, infoText: rich }), imageUrl })} />);
+      expect(html).toContain('<h2 dir="auto" class="bs-md-h1">Rules</h2>');
+      expect(html).toContain('<p dir="auto" style="text-align:center">Win <span style="color:#c62828;font-size:1.3em">big</span> <u>prizes</u></p>');
+      expect(html).toMatch(/class="bs-md-img bs-md-img--s" style="text-align:end"><img src="https:\/\/img.test\/users\/u\/images\/info1\/print.webp"[^>]*max-height:[\d.]+mm/);
+    }
+  });
+
+  it("skips images without a URL and never renders raw HTML", () => {
+    const html = renderToStaticMarkup(<InfoText md={`![m](${IMG})
+
+<img src=x onerror=alert(1)> [x]{red;background:url(x)}`} />);
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(html).not.toContain("background");
+  });
+
+  it("fills the info area with one image in image mode, keeping serial and QR", () => {
+    const pl = layout({ arrangement: "grid", infoMode: "image", infoImage: IMG, infoImageFit: "cover", infoText: "Hidden text" });
+    const html = renderToStaticMarkup(<SheetLayout {...props({ printLayout: pl, imageUrl })} />);
+    expect(html).toMatch(/<section class="bs-meta".*№ 042.*bs-qr.*class="bs-info bs-info--image"><img class="bs-info-img" src="https:\/\/img.test\/users\/u\/images\/info1\/print.webp"[^>]*object-fit:cover/);
+    expect(html).not.toContain("Hidden text");
+    const row = renderToStaticMarkup(<SheetLayout {...props({ printLayout: layout({ infoMode: "image", infoImage: IMG }), imageUrl })} />);
+    expect(row).toMatch(/class="bs-info bs-info--image bs-info--foot" style="height:[\d.]+mm"><img[^>]*object-fit:contain/);
+    expect(row).toContain("№ 042");
+    // Image mode without an image shows nothing (and a stretched layout reclaims the space).
+    const none = renderToStaticMarkup(<SheetLayout {...props({ printLayout: layout({ infoMode: "image", infoText: "x" }) })} />);
+    expect(none).not.toContain("bs-info");
+  });
+
+  it("shrinks the text when images take part of the box", () => {
+    const text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(6);
+    const font = (md: string) => Number(renderToStaticMarkup(<SheetLayout {...props({ printLayout: layout({ arrangement: "grid", infoText: md }), imageUrl })} />).match(/class="bs-md bs-info" style="font-size:([\d.]+)mm/)![1]);
+    expect(font(`${text}\n\n![l](${IMG})`)).toBeLessThan(font(text));
+  });
+});
+
 describe("qrSvg / renderSheetsHtml", () => {
   it("produces SVG markup", async () => {
     const svg = await qrSvg("https://bingo.test/s/g1/042");

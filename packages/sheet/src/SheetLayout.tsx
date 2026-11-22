@@ -1,7 +1,10 @@
 import {
   blockOrder,
   formatSerial,
+  hasInfoContent,
   INFO_BLOCK,
+  infoShowsImage,
+  parseInfoText,
   GAP_MM,
   HEADER_MM,
   LABEL_MM,
@@ -12,7 +15,7 @@ import {
 } from "@bingo/core";
 import type { CSSProperties } from "react";
 import { BoardGrid, InfoText } from "./components";
-import { fitInfoFontMm } from "./fit";
+import { fitInfoFontMm, planInfo } from "./fit";
 import type { Resolve } from "./resolve";
 
 export interface SheetLayoutProps {
@@ -28,6 +31,8 @@ export interface SheetLayoutProps {
   qrSvg: string;
   /** Resolved URL (or data URL) of `printLayout.backgroundImage`. */
   backgroundUrl?: string;
+  /** Resolves info images (`infoImage` and images in the info text) to URLs (or data URLs). */
+  imageUrl?: (storagePath: string) => string | undefined;
   className?: string;
   style?: CSSProperties;
 }
@@ -53,12 +58,21 @@ function fitLineFont(text: string, w: number, maxLines: number, max: number, min
   return min;
 }
 
-function infoLengths(md: string): number[] {
-  return md
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((l) => [...l].length + 2);
+/** Font size (mm) for the info text in a `w`×`h` mm box, leaving images their share. */
+function infoFont(md: string, w: number, h: number): number {
+  const plan = planInfo(parseInfoText(md), h);
+  return plan.units.length ? fitInfoFontMm(plan.units, w, plan.textH) : 3.6;
+}
+
+const cssUrl = (u: string) => u.replace(/["\\\n]/g, "");
+
+/** The full info-area image (image mode). */
+function InfoImage({ url, fit, className, style }: { url?: string; fit?: "contain" | "cover"; className?: string; style?: CSSProperties }) {
+  return (
+    <div className={["bs-info", "bs-info--image", className].filter(Boolean).join(" ")} style={style}>
+      {url ? <img className="bs-info-img" src={url} alt="" draggable={false} style={{ objectFit: fit === "cover" ? "cover" : "contain" }} /> : null}
+    </div>
+  );
 }
 
 function Serial({ serial, fontMm }: { serial: number; fontMm: number }) {
@@ -91,7 +105,11 @@ export function SheetLayout(props: SheetLayoutProps) {
   const arrangement = n === 1 ? "single" : pl.arrangement;
   const margin = pl.marginMm;
   const heading = pl.heading?.trim() ?? "";
-  const info = pl.infoText?.trim() ?? "";
+  const imageMode = pl.infoMode === "image";
+  const showImage = infoShowsImage(pl);
+  const info = imageMode ? "" : (pl.infoText?.trim() ?? "");
+  const hasInfo = hasInfoContent(pl);
+  const infoImageUrl = showImage ? props.imageUrl?.(pl.infoImage!) : undefined;
   const showQr = pl.showQr !== false;
   const order = blockOrder(pl.order, arrangement, n);
   const m = layoutMetrics({
@@ -103,7 +121,7 @@ export function SheetLayout(props: SheetLayoutProps) {
     rows,
     cols,
     stretch: !!pl.stretch,
-    hasInfo: !!info,
+    hasInfo,
   });
   const { page } = m;
   const innerW = page.w - 2 * margin;
@@ -154,7 +172,7 @@ export function SheetLayout(props: SheetLayoutProps) {
         <div
           className="bs-bg"
           aria-hidden="true"
-          style={{ backgroundImage: `url("${bgUrl.replace(/["\\\n]/g, "")}")`, opacity: Math.min(1, Math.max(0.05, pl.backgroundOpacity ?? 1)) }}
+          style={{ backgroundImage: `url("${cssUrl(bgUrl)}")`, opacity: Math.min(1, Math.max(0.05, pl.backgroundOpacity ?? 1)) }}
         />
       ) : null}
     </>
@@ -194,7 +212,7 @@ export function SheetLayout(props: SheetLayoutProps) {
     const headingFont = heading ? fitLineFont(heading, qW - 8, 3, 7, 3.5) : 0;
     const headingH = heading ? headingFont * 1.15 * Math.min(3, Math.ceil(([...heading].length * headingFont * 0.55) / (qW - 8))) : 0;
     const infoH = qH - 4 - headingH - idH - (heading ? 3 : 0) - 3 - 2.3 - 1;
-    const infoFont = info ? fitInfoFontMm(infoLengths(info), qW - 8, infoH) : 0;
+    const infoFontMm = info ? infoFont(info, qW - 8, infoH) : 0;
     const meta = (
       <>
         {heading ? (
@@ -206,7 +224,11 @@ export function SheetLayout(props: SheetLayoutProps) {
           <Serial serial={serial} fontMm={serialFont} />
           {showQr ? <Qr svg={qrSvg} sizeMm={qrSize} /> : null}
         </div>
-        {info ? <InfoText md={info} className="bs-info" style={{ fontSize: mm(infoFont) }} /> : null}
+        {showImage ? (
+          <InfoImage url={infoImageUrl} fit={pl.infoImageFit} />
+        ) : info ? (
+          <InfoText md={info} className="bs-info" style={{ fontSize: mm(infoFontMm) }} imageUrl={props.imageUrl} boxHeightMm={infoH} />
+        ) : null}
       </>
     );
     return (
@@ -237,7 +259,7 @@ export function SheetLayout(props: SheetLayoutProps) {
   const boardsH =
     arrangement === "column" ? n * (LABEL_MM + boardH) + (n - 1) * GAP_MM : LABEL_MM + boardH;
   const infoH = innerH - HEADER_MM - boardsH - 4;
-  const infoFont = info ? fitInfoFontMm(infoLengths(info), innerW, infoH) : 0;
+  const infoFontMm = info ? infoFont(info, innerW, infoH) : 0;
   return (
     <div className={pageCls} style={pageStyle} lang={lang} dir={lang === "he" ? "rtl" : "ltr"}>
       {pageRule}
@@ -256,8 +278,16 @@ export function SheetLayout(props: SheetLayoutProps) {
       >
         {order.map((i) => slot(boards[i] ?? [], i))}
       </div>
-      {info ? (
-        <InfoText md={info} className="bs-info" style={{ fontSize: mm(infoFont), maxHeight: mm(infoH + 4) }} />
+      {showImage ? (
+        <InfoImage url={infoImageUrl} fit={pl.infoImageFit} className="bs-info--foot" style={{ height: mm(infoH + 2) }} />
+      ) : info ? (
+        <InfoText
+          md={info}
+          className="bs-info"
+          style={{ fontSize: mm(infoFontMm), maxHeight: mm(infoH + 4) }}
+          imageUrl={props.imageUrl}
+          boxHeightMm={infoH}
+        />
       ) : null}
     </div>
   );

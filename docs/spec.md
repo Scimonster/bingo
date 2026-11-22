@@ -90,7 +90,7 @@ Board size, free space and boards per sheet freeze once sheets exist. Title and 
 - 
 The host generates sheets. Each sheet has one serial number and one board per slot.
 - 
-A printout shows the serial, a QR code, one board per slot labelled with its slot label ("Game 1", "Game 2", "Game 3"), and a free-text info area. Info text is the same on every sheet.
+A printout shows the serial, a QR code, one board per slot labelled with its slot label ("Game 1", "Game 2", "Game 3"), and an info box. The info box is the same on every sheet: rich text with images, or one full image.
 - 
 Within a slot, every board is unique across all sheets. Boards on the same sheet differ from each other in both items and layout.
 **Rounds**
@@ -193,7 +193,7 @@ Three top-level concepts, each justified by a requirement: a game holds content;
 games/{gameId}
   ownerId, title, createdAt, playerLanguage: "he"|"en"
   settings:    { rows, cols, freeSpace: { enabled, row, col, content?: { type: "text"|"image", text?, storagePath? } }, boardsPerSheet }
-  printLayout: { heading?, slotLabels: ["Game 1", ...], infoText, paperSize, orientation, arrangement: "row"|"column"|"grid"|"single", marginMm, order?: number[] /* slots, -1 = grid info panel */, showQr?, stretch?, backgroundColor?, backgroundImage?, backgroundOpacity? }
+  printLayout: { heading?, slotLabels: ["Game 1", ...], infoText, infoMode?: "text"|"image", infoImage?, infoImageFit?: "contain"|"cover", paperSize, orientation, arrangement: "row"|"column"|"grid"|"single", marginMm, order?: number[] /* slots, -1 = grid info panel */, showQr?, stretch?, backgroundColor?, backgroundImage?, backgroundOpacity? }
   contentLocked ⚙️                       true once sheets exist
   clonedFrom? ⚙️
 
@@ -600,7 +600,7 @@ The QR encodes `/s/{gameId}/{serial}`.
 - 
 The free space shows its configured text or image, or a star by default. Image cleanup treats a free-space image as referenced.
 - 
-Info text is basic rich text (bold, italic, bullet and numbered lists, line breaks), stored as sanitized Markdown, up to 1,500 characters, identical on every sheet.
+Info box: rich text edited WYSIWYG (title and subtitle headings; bold, italic, underline; text size small/normal/large/extra large; six-colour palette; start/centre/end alignment; bullet and numbered lists; line breaks) plus images on their own lines (sizes S/M/L, aligned like text, sharing the box height with the text). It is stored as a small Markdown-like markup (see `packages/core/src/markdown.ts`), up to 3,000 characters, parsed to an AST and never rendered as HTML. Alternatively, "Full image" mode fills the info box with one uploaded image (whole image, or cropped to fill) while the serial and QR keep their place; the text is kept for switching back. Image cleanup treats info images as referenced.
 - 
 Images print from the larger resized variant.
 - 
@@ -643,7 +643,7 @@ Block order: the host can reorder the boards (and, in the grid, the info panel) 
 - 
 The QR code can be hidden. Players then can't scan to link a paper sheet; the serial still identifies it.
 - 
-"Stretch boards" fills the available space, so cells may be non-square; without info text it also reclaims the info area. Cell text fits the cell's actual shape.
+"Stretch boards" fills the available space, so cells may be non-square; with an empty info box it also reclaims the info area. Cell text fits the cell's actual shape.
 - 
 Background: an optional page colour and/or image (the print variant, cropped to cover the page, with adjustable opacity). Boards keep white cells, and the header, labels and info get a light backing so they stay readable.
 - 
@@ -731,7 +731,7 @@ one per slot |
 Game 1, Game 2, Game 3 |
 |
 Info text |
-up to 1,500 characters |
+up to 3,000 characters of markup |
 empty |
 |
 Text item |
@@ -788,7 +788,7 @@ Custom pattern editor in v1 |
 Yes |
 |
 Info text formatting |
-Basic rich text: bold, italic, lists, line breaks |
+WYSIWYG rich text: headings, bold, italic, underline, sizes, colours, alignment, lists, images; or one full image |
 |
 Host sign-in providers |
 Google only |

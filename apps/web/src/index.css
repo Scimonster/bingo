@@ -51,3 +51,13 @@ body {
     display: none;
   }
 }
+
+/* Info box editor (content uses the sheet's .bs-md styles; these match its headings and images). */
+.info-editor { font-size: 15px; line-height: 1.35; }
+.info-editor h1 { font-size: 1.5em; font-weight: 700; line-height: 1.2; margin: 0 0 0.3em; }
+.info-editor h2 { font-size: 1.2em; font-weight: 700; line-height: 1.2; margin: 0 0 0.3em; }
+.info-editor-img { margin: 0 0 0.45em; line-height: 0; }
+.info-editor-img img { display: inline-block; max-width: 100%; height: auto; }
+.info-editor-img--s { max-height: 4em; max-width: 35% !important; }
+.info-editor-img--m { max-height: 7em; max-width: 65% !important; }
+.info-editor-img--l { max-height: 12em; }

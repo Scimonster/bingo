@@ -124,7 +124,8 @@ service cloud.firestore {
       return p is map
         && p.keys().hasAll(['slotLabels', 'infoText', 'paperSize', 'orientation', 'arrangement', 'marginMm'])
         && p.keys().hasOnly(['heading', 'slotLabels', 'infoText', 'paperSize', 'orientation', 'arrangement', 'marginMm',
-                             'order', 'showQr', 'stretch', 'backgroundColor', 'backgroundImage', 'backgroundOpacity'])
+                             'order', 'showQr', 'stretch', 'backgroundColor', 'backgroundImage', 'backgroundOpacity',
+                             'infoMode', 'infoImage', 'infoImageFit'])
         && (!('heading' in p) || isStr(p.heading, 0, 120))
         && p.slotLabels is list
         && p.slotLabels.size() <= 4
@@ -132,7 +133,11 @@ service cloud.firestore {
         && validSlotLabelAt(p.slotLabels, 1)
         && validSlotLabelAt(p.slotLabels, 2)
         && validSlotLabelAt(p.slotLabels, 3)
-        && isStr(p.infoText, 0, 1500)
+        // Info-text markup; parsed to an AST by clients and Functions, never rendered as HTML.
+        && isStr(p.infoText, 0, 3000)
+        && (!('infoMode' in p) || p.infoMode in ['text', 'image'])
+        && (!('infoImage' in p) || validStoragePath(p.infoImage))
+        && (!('infoImageFit' in p) || p.infoImageFit in ['contain', 'cover'])
         && p.paperSize in ['A5', 'A4', 'A3', 'Letter', 'Legal', 'Tabloid']
         && p.orientation in ['portrait', 'landscape']
         && p.arrangement in ['row', 'column', 'grid', 'single']

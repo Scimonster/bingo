@@ -42,6 +42,7 @@ export async function buildSheetPages(input: PdfInput): Promise<SheetLayoutProps
       resolve,
       qrSvg: game.printLayout.showQr === false ? "" : await qrSvg(`${origin}${sheetQrPath(input.gameId, s.serial)}`),
       backgroundUrl,
+      imageUrl: (p: string) => input.images[p],
     })),
   );
 }

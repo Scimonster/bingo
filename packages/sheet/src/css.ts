@@ -216,9 +216,26 @@ button.bs-cell:active { filter: brightness(0.94); }
 }
 .bs-md p { margin: 0 0 0.45em; }
 .bs-md ul, .bs-md ol { margin: 0 0 0.45em; padding-inline-start: 1.3em; }
+.bs-md ul { list-style: disc; }
+.bs-md ol { list-style: decimal; }
 .bs-md li { margin: 0; }
 .bs-md > :last-child { margin-bottom: 0; }
 .bs-md b { font-weight: 700; }
+.bs-md u { text-decoration: underline; text-underline-offset: 0.12em; }
+.bs-md h2, .bs-md h3 { margin: 0 0 0.3em; font-weight: 700; line-height: 1.2; }
+.bs-md .bs-md-h1 { font-size: 1.5em; }
+.bs-md .bs-md-h2 { font-size: 1.2em; }
+.bs-md-img { margin: 0 0 0.45em; line-height: 0; }
+.bs-md-img img { display: inline-block; max-width: 100%; height: auto; vertical-align: top; object-fit: contain; }
+.bs-md-img--s img { max-height: 4em; }
+.bs-md-img--m img { max-height: 7em; }
+.bs-md-img--l img { max-height: 12em; }
+
+/* Full info-area image (image mode). */
+.bs-info.bs-info--image { flex: 1 1 auto; min-height: 0; display: flex; padding: 0; border-top: 0; margin-top: 0; }
+.bs-meta .bs-info.bs-info--image { border-top: 0; padding-top: 0; }
+.bs-info.bs-info--foot { flex: none; margin-top: 2mm; }
+.bs-info-img { display: block; width: 100%; height: 100%; min-height: 0; }
 
 /* ---------- Page background ---------- */
 .bs-bg {
