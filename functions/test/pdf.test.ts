@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { FREE, type GameSettings, type PrintLayout } from "@bingo/core";
 import { heeboFontCssFrom } from "../src/pdf/fontCss";
-import { buildSheetsHtml, renderSheetsPdf, type PdfInput } from "../src/pdf/render";
+import { buildSheetsDocument, buildSheetsHtml, renderSheetsPdf, type PdfInput } from "../src/pdf/render";
 
 const chrome = [process.env.CHROME_PATH, "/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"].find(
   (p): p is string => !!p && existsSync(p),
@@ -80,6 +80,37 @@ describe("PDF export rendering", () => {
     expect(html).not.toContain("<b>mug</b>");
     expect(html).toContain("data:image/svg+xml;base64");
   });
+
+  it("references images by placeholder URL instead of inlining them per cell", async () => {
+    const many: PdfInput = {
+      ...input,
+      sheets: Array.from({ length: 40 }, (_, i) => ({ serial: i + 1, boards: [0, 1, 2].map((s) => board(i * 3 + s)) })),
+    };
+    const { html, assets } = await buildSheetsDocument(many);
+    expect(html).not.toContain("data:image/");
+    expect(assets.size).toBe(2);
+    const urls = [...assets.keys()];
+    expect(html).toContain(`src="${urls[0]}"`);
+    // Each image's bytes are held once, not once per use.
+    expect(assets.get(urls[0]!)!.contentType).toBe("image/svg+xml");
+    expect(assets.get(urls[0]!)!.body.toString()).toContain("<svg");
+    // HTML size doesn't grow with image size (a 1 MB image used in hundreds of cells).
+    const big = `data:image/png;base64,${"A".repeat(1_000_000)}`;
+    const bigDoc = await buildSheetsDocument({ ...many, images: { ...many.images, "users/u/images/1": big } });
+    expect(bigDoc.html.length).toBe(html.length);
+  });
+
+  it.skipIf(!chrome)(
+    "serves placeholder image URLs to Chrome while printing",
+    async () => {
+      // 1×1 PNG: raster images show up as /Subtype /Image XObjects in the PDF.
+      const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+      const withPng: PdfInput = { ...input, sheets: input.sheets.slice(0, 1), images: { ...input.images, "users/u/images/1": png } };
+      const text = Buffer.from(await renderSheetsPdf(withPng, { executablePath: chrome })).toString("latin1");
+      expect(text).toMatch(/\/Subtype\s*\/Image/);
+    },
+    120_000,
+  );
 
   it("draws info-box images and the full info image from the loaded images", async () => {
     const rich: PdfInput = {
