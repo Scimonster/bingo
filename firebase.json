@@ -7,21 +7,15 @@
   },
   "functions": [
     {
-      "source": "functions",
+      "source": "functions/lib",
       "codebase": "default",
       "disallowLegacyRuntimeConfig": true,
       "ignore": [
         "node_modules",
-        ".git",
-        "src",
-        "test",
-        "scripts",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
         "*.local"
       ],
       "predeploy": [
-        "pnpm --dir \"$RESOURCE_DIR\" run build"
+        "pnpm --dir \"$PROJECT_DIR/functions\" run build"
       ]
     }
   ],
